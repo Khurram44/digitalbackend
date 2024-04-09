@@ -27,6 +27,9 @@ mongoose.connect(process.env.MONGO_URL, {
 // Load your data
 const entities = JSON.parse(fs.readFileSync('data.json', 'utf8'));
 
+app.get("/", (req, res) => {
+    res.json({ message: "Welcome to the Digital Backend API!" });
+  });
 // Scraping route
 app.get("/scrape", async (req, res) => {
     let scrapedResults = [];
