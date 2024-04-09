@@ -8,7 +8,7 @@ const fs = require('fs');
 env.config();
 
 const app = express();
-app.use(express.static('public'));
+app.use(express.static('public'));   
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cors());
@@ -18,7 +18,6 @@ const apifyClient = new ApifyClient({
     token: process.env.APIFY_TOKEN,
 });
 
-// Connect MongoDB
 mongoose.set("strictQuery", false);
 mongoose.connect(process.env.MONGO_URL, {
     useNewUrlParser: true,
@@ -59,7 +58,7 @@ app.get("/scrape", async (req, res) => {
 
     // Respond with the scraped data
     res.json(scrapedResults);
-});
+});   
 
 // Starting the server
 app.listen(process.env.PORT, () => {
