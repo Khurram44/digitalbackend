@@ -12,6 +12,7 @@
   "license": "ISC",
   "dependencies": {
     "apify-client": "^2.9.3",
+    "axios": "^1.6.8",
     "bcrypt": "^5.1.1",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
@@ -21,4 +22,4 @@
     "nodemailer": "^6.9.7",
     "path": "^0.12.7"
   }
-}   
+}
