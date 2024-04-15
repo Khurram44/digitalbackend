@@ -1,5 +1,23 @@
 [
     {
+        "Bedrijfsnaam": "De manderveense Aardbei",
+        "Facebookadres": "https://www.facebook.com/demanderveenseaardbei/",
+        "Winkels": "x",
+        "Horeca": "x",
+        "Verenigingen": "",
+        "Bedrijven": "",
+        "Evenementen": ""
+    },
+    {
+        "Bedrijfsnaam": "Jabé Reclame B.V.",
+        "Facebookadres": "https://www.facebook.com/jabereclame/",
+        "Winkels": "",
+        "Horeca": "",
+        "Verenigingen": "",
+        "Bedrijven": "x",
+        "Evenementen": ""
+    },
+    {
         "Bedrijfsnaam": "Groentehal Oosterik",
         "Facebookadres": "https://www.facebook.com/groentehaloosterik/",
         "Winkels": "x",
@@ -9,8 +27,8 @@
         "Evenementen": ""
     },
     {
-        "Bedrijfsnaam": "Humans of New York",
-        "Facebookadres": "https://www.facebook.com/humansofnewyork/",
+        "Bedrijfsnaam": "CV Mander",
+        "Facebookadres": "https://www.facebook.com/cv.mander.7/",
         "Winkels": "",
         "Horeca": "",
         "Verenigingen": "x",
@@ -18,19 +36,145 @@
         "Evenementen": ""
     },
     {
-        "Bedrijfsnaam": "Official Coffee shope",
-        "Facebookadres": "https://www.facebook.com/officialcoffeeshop/",
+        "Bedrijfsnaam": "Bakkerij Koopmans",
+        "Facebookadres": "https://www.facebook.com/bakkerijkoopmans/",
         "Winkels": "x",
         "Horeca": "",
         "Verenigingen": "",
         "Bedrijven": "",
-        "Evenementen": "x"
+        "Evenementen": ""
     },
     {
-        "Bedrijfsnaam": "Google Doodle",
-        "Facebookadres": "https://www.facebook.com/Google/",
-        "Winkels": "x",
+        "Bedrijfsnaam": "Kroegtijgers",
+        "Facebookadres": "https://www.facebook.com/cvdekroegtijgers/",
+        "Winkels": "",
+        "Horeca": "",
+        "Verenigingen": "x",
+        "Bedrijven": "",
+        "Evenementen": ""
+    },
+    {
+        "Bedrijfsnaam": "Ria's Eetcafe",
+        "Facebookadres": "https://www.facebook.com/p/Rias-Eetcaf%C3%A9-100063764374559/",
+        "Winkels": "",
         "Horeca": "x",
+        "Verenigingen": "",
+        "Bedrijven": "",
+        "Evenementen": ""
+    },
+    {
+        "Bedrijfsnaam": "Jut & Jul",
+        "Facebookadres": "https://www.facebook.com/jutenjultubbergen/",
+        "Winkels": "x",
+        "Horeca": "",
+        "Verenigingen": "",
+        "Bedrijven": "",
+        "Evenementen": ""
+    },
+    {
+        "Bedrijfsnaam": "Hema ",
+        "Facebookadres": "https://www.facebook.com/HEMATubbergen/",
+        "Winkels": "x",
+        "Horeca": "",
+        "Verenigingen": "",
+        "Bedrijven": "",
+        "Evenementen": ""
+    },
+    {
+        "Bedrijfsnaam": "Tuunte",
+        "Facebookadres": "https://www.facebook.com/TeamTuunteTubbergen/",
+        "Winkels": "x",
+        "Horeca": "",
+        "Verenigingen": "",
+        "Bedrijven": "",
+        "Evenementen": ""
+    },
+    {
+        "Bedrijfsnaam": "De Buurvrouw & Ik",
+        "Facebookadres": "https://www.facebook.com/debuurvrouwenik/",
+        "Winkels": "x",
+        "Horeca": "",
+        "Verenigingen": "",
+        "Bedrijven": "",
+        "Evenementen": ""
+    },
+    {
+        "Bedrijfsnaam": "Tuttebel",
+        "Facebookadres": "https://www.facebook.com/tuttebeltubbergen/",
+        "Winkels": "x",
+        "Horeca": "",
+        "Verenigingen": "",
+        "Bedrijven": "",
+        "Evenementen": ""
+    },
+    {
+        "Bedrijfsnaam": "Marskramer",
+        "Facebookadres": "https://www.facebook.com/p/Marskramer-Tubbergen-100076344691433/",
+        "Winkels": "x",
+        "Horeca": "",
+        "Verenigingen": "",
+        "Bedrijven": "",
+        "Evenementen": ""
+    },
+    {
+        "Bedrijfsnaam": "Expert ",
+        "Facebookadres": "https://www.facebook.com/ExpertTubbergen/",
+        "Winkels": "x",
+        "Horeca": "",
+        "Verenigingen": "",
+        "Bedrijven": "",
+        "Evenementen": ""
+    },
+    {
+        "Bedrijfsnaam": "Homegifts en fashion",
+        "Facebookadres": "https://www.facebook.com/www.homegifts.nl/",
+        "Winkels": "x",
+        "Horeca": "",
+        "Verenigingen": "",
+        "Bedrijven": "",
+        "Evenementen": ""
+    },
+    {
+        "Bedrijfsnaam": "Ter Stal",
+        "Facebookadres": "https://www.facebook.com/terStal.Tubbergen/",
+        "Winkels": "x",
+        "Horeca": "",
+        "Verenigingen": "",
+        "Bedrijven": "",
+        "Evenementen": ""
+    },
+    {
+        "Bedrijfsnaam": "Blitzz mode",
+        "Facebookadres": "https://www.facebook.com/p/BlitZz-Mode-100063140174226/",
+        "Winkels": "x",
+        "Horeca": "",
+        "Verenigingen": "",
+        "Bedrijven": "",
+        "Evenementen": ""
+    },
+    {
+        "Bedrijfsnaam": "City Mode",
+        "Facebookadres": "https://www.facebook.com/p/City-Mode-100063623347998/",
+        "Winkels": "x",
+        "Horeca": "",
+        "Verenigingen": "",
+        "Bedrijven": "",
+        "Evenementen": ""
+    },
+    {
+        "Bedrijfsnaam": "Primera",
+        "Facebookadres": "https://www.facebook.com/tubbergenprimera/",
+        "Winkels": "x",
+        "Horeca": "",
+        "Verenigingen": "",
+        "Bedrijven": "",
+        "Evenementen": ""
+    },
+    {
+        "Bedrijfsnaam": "La Cuisine",
+        "Facebookadres": "https://www.facebook.com/ScandinavischkadoByLaCuisine/",
+        "Winkels": "x",
+        "Horeca": "",
         "Verenigingen": "",
         "Bedrijven": "",
         "Evenementen": ""
