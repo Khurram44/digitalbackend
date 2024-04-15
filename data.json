@@ -178,5 +178,95 @@
         "Verenigingen": "",
         "Bedrijven": "",
         "Evenementen": ""
+    },
+    {
+        "Bedrijfsnaam": "Zuivelhoeve",
+        "Facebookadres": "https://www.facebook.com/zuivelhoeve.almelotubbergen/",
+        "Winkels": "x",
+        "Horeca": "",
+        "Verenigingen": "",
+        "Bedrijven": "",
+        "Evenementen": ""
+    },
+    {
+        "Bedrijfsnaam": "Leads",
+        "Facebookadres": "https://www.facebook.com/p/Leads-Lady-Leads-Tubbergen-100048269441239/",
+        "Winkels": "x",
+        "Horeca": "",
+        "Verenigingen": "",
+        "Bedrijven": "",
+        "Evenementen": ""
+    },
+    {
+        "Bedrijfsnaam": "Koters kinderkleding",
+        "Facebookadres": "https://www.facebook.com/koters.kinderkleding.7/",
+        "Winkels": "x",
+        "Horeca": "",
+        "Verenigingen": "",
+        "Bedrijven": "",
+        "Evenementen": ""
+    },
+    {
+        "Bedrijfsnaam": "Kleibakker",
+        "Facebookadres": "https://www.facebook.com/people/Bakkerij-De-Kleibakker/100064034585688/",
+        "Winkels": "x",
+        "Horeca": "",
+        "Verenigingen": "",
+        "Bedrijven": "",
+        "Evenementen": ""
+    },
+    {
+        "Bedrijfsnaam": "Reinerink Bloemen en Planten",
+        "Facebookadres": "https://www.facebook.com/reinerinkbloemen/",
+        "Winkels": "x",
+        "Horeca": "",
+        "Verenigingen": "",
+        "Bedrijven": "",
+        "Evenementen": ""
+    },
+    {
+        "Bedrijfsnaam": "Niels Slagerij",
+        "Facebookadres": "https://www.facebook.com/NielsSlagerij/",
+        "Winkels": "x",
+        "Horeca": "",
+        "Verenigingen": "",
+        "Bedrijven": "",
+        "Evenementen": ""
+    },
+    {
+        "Bedrijfsnaam": "Keurslager Hulshof",
+        "Facebookadres": "https://www.facebook.com/keurslagerijhulshof/",
+        "Winkels": "x",
+        "Horeca": "",
+        "Verenigingen": "",
+        "Bedrijven": "",
+        "Evenementen": ""
+    },
+    {
+        "Bedrijfsnaam": "Koffiesnor ",
+        "Facebookadres": "https://www.facebook.com/dekoffiesnor/",
+        "Winkels": "",
+        "Horeca": "x",
+        "Verenigingen": "",
+        "Bedrijven": "",
+        "Evenementen": ""
+    },
+    {
+        "Bedrijfsnaam": "Natuurlijk Crossen",
+        "Facebookadres": "https://www.facebook.com/Hetstoerstekinderuitje",
+        "Winkels": "",
+        "Horeca": "",
+        "Verenigingen": "",
+        "Bedrijven": "x",
+        "Evenementen": "x"
+    },
+    {
+        "Bedrijfsnaam": "Landgoed Het Meenen",
+        "Facebookadres": "https://www.facebook.com/p/Landgoed-Het-Meenen-100085915728879/",
+        "Winkels": "",
+        "Horeca": "",
+        "Verenigingen": "",
+        "Bedrijven": "x",
+        "Evenementen": ""
     }
 ]
