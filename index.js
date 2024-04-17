@@ -9,7 +9,7 @@ const Scrape = require("./models/scrape");
 env.config();
 
 const app = express();
-app.use(express.static('public'));   
+app.use(express.static('public'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cors());
@@ -27,19 +27,27 @@ mongoose.connect(process.env.MONGO_URL, {
 // Load your data
 const entities = JSON.parse(fs.readFileSync('data.json', 'utf8'));
 
+
 app.get("/", (req, res) => {
     res.json({ message: "Welcome to the Digital Backend API!" });
-  });
+});
 
-  //get scrped result
-  app.get("/result",async (req,res)=>{
+const excel = require('./routes/excelfile')
+const auth = require('./routes/user')
+
+app.use('/exceldata', excel)
+app.use('/auth', auth)
+
+
+//get scrped result
+app.get("/result", async (req, res) => {
     try {
         const result = await Scrape.find()
-        res.status(200).send({status:true , result:result})
+        res.status(200).send({ status: true, result: result })
     } catch (error) {
-        res.status(400).send({status:false,error:error})
+        res.status(400).send({ status: false, error: error })
     }
-  })
+})
 // Scraping route
 app.get("/scrape", async (req, res) => {
     let scrapedResults = [];
@@ -58,7 +66,7 @@ app.get("/scrape", async (req, res) => {
 
             if (businessDetailsRun && businessDetailsRun.defaultDatasetId) {
                 const { items: businessDetails } = await apifyClient.dataset(businessDetailsRun.defaultDatasetId).listItems();
-                
+
                 // Prepare Actor input for fetching latest post
                 const latestPostInput = {
                     startUrls: [{ url: `${entity.Facebookadres}/posts` }],
@@ -94,7 +102,7 @@ app.get("/scrape", async (req, res) => {
     // Respond with the scraped data
     res.json(scrapedResults);
 });
-  
+
 
 // Starting the server
 app.listen(process.env.PORT, () => {
