@@ -12,10 +12,12 @@
   "license": "ISC",
   "dependencies": {
     "apify-client": "^2.9.3",
+    "async-mutex": "^0.5.0",
     "axios": "^1.6.8",
     "bcrypt": "^5.1.1",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
+    "cron": "^3.1.7",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "jsonwebtoken": "^9.0.2",
