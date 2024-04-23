@@ -6,7 +6,7 @@ const { ApifyClient } = require('apify-client');
 const fs = require('fs');
 const Scrape = require("./models/scrape");
 const { Semaphore } = require('async-mutex');
-
+const axios = require('axios');
 // Define the maximum concurrency
 const MAX_CONCURRENCY = 2;
 const semaphore = new Semaphore(MAX_CONCURRENCY);
@@ -27,21 +27,18 @@ mongoose.connect(process.env.MONGO_URL, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
 }).then(() => console.log("Connected to Database")).catch((err) => console.warn(err));
-
-// Load your data
-const entities = JSON.parse(fs.readFileSync('data.json', 'utf8'));
-
-
-app.get("/", (req, res) => {
-    res.json({ message: "Welcome to the Digital Backend API!" });
-});
-
 const excel = require('./routes/excelfile')
 const auth = require('./routes/user')
 
 app.use('/exceldata', excel)
 app.use('/auth', auth)
+// Load your data
+// const entities = JSON.parse(fs.readFileSync('data.json', 'utf8'));
 
+
+app.get("/", (req, res) => {
+    res.json({ message: "Welcome to the Digital Backend API!" });
+});
 
 //get scrped result
 app.get("/result", async (req, res) => {
@@ -53,8 +50,19 @@ app.get("/result", async (req, res) => {
     }
 })
 
-
+async function loadEntities() {
+    try {
+        // Update the URL to the actual location of your /exceldata/getjson endpoint
+        const response = await axios.get('https://digitalbackend-f362d91cd976.herokuapp.com/exceldata/getjson');
+        return response.data;
+    } catch (error) {
+        console.error('Failed to fetch entities:', error);
+        return [];  // Return an empty array or handle the error as needed
+    }
+}
 app.get("/scrape", async (req, res) => {
+    const entities = await loadEntities();  // Fetch entities right before they are needed
+
     let scrapedResults = [];
     let processedEntities = 0;
     console.log(entities.length);
@@ -100,7 +108,6 @@ async function scrapeEntity(entity, scrapedResults) {
             startUrls: [{ url: entity.Facebookadres }],
             resultsLimit: 1,
         };
-
         // Run the Actor to fetch business details
         const businessDetailsRun = await apifyClient.actor("KoJrdxJCTtpon81KY").call(businessDetailsInput);
 
