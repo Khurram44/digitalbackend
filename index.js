@@ -42,14 +42,25 @@ app.get("/", (req, res) => {
 
 //get scrped result
 app.get("/result", async (req, res) => {
-    try {
-        const result = await Scrape.find()
-        res.status(200).send({ status: true, result: result })
-    } catch (error) {
-        res.status(400).send({ status: false, error: error })
-    }
-})
+    const page = parseInt(req.query.page) || 1; // Page number, default to 1
+    const limit = parseInt(req.query.limit) || 10; // Number of results per page, default to 10
 
+    try {
+        const skip = (page - 1) * limit;
+        const total = await Scrape.countDocuments(); // Total number of documents in the collection
+        const result = await Scrape.find().skip(skip).limit(limit); // Fetch documents for the current page
+
+        res.status(200).send({
+            status: true,
+            result: result,
+            total: total,
+            page: page,
+            pages: Math.ceil(total / limit) // Calculate total number of pages
+        });
+    } catch (error) {
+        res.status(500).send({ status: false, error: error.message }); // Handle internal server error
+    }
+});
 async function loadEntities() {
     try {
         // Update the URL to the actual location of your /exceldata/getjson endpoint
