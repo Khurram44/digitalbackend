@@ -1,14 +1,17 @@
 const router = require('express').Router();
 const multer = require('multer');
-const upload = multer({ dest: 'uploads/' });
 const XLSX = require('xlsx');
 const Business = require('../models/excelfile');  // Import your Business model
+
+// Configure multer to use memory storage
+const storage = multer.memoryStorage();
+const upload = multer({ storage: storage });
 
 router.post('/upload', upload.single('file'), async (req, res) => {
     if (req.file) {
         try {
-            // Read the Excel file
-            const workbook = XLSX.readFile(req.file.path);
+            // Read the Excel file from the buffer
+            const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
             const sheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[sheetName];
             const rows = XLSX.utils.sheet_to_json(worksheet);
@@ -62,6 +65,7 @@ router.get('/getjson', async (req, res) => {
         res.status(500).send(err.message);
     }
 });
+
 // Edit
 router.put('/update/:id', async (req, res) => {
     const { id } = req.params;
@@ -80,6 +84,7 @@ router.put('/update/:id', async (req, res) => {
         res.status(500).send({ message: err.message });
     }
 });
+
 // Delete
 router.delete('/delete/:id', async (req, res) => {
     const { id } = req.params;
@@ -97,7 +102,6 @@ router.delete('/delete/:id', async (req, res) => {
         res.status(500).send(err.message);
     }
 });
-
 
 // DeleteAll
 router.delete('/delete-all', async (req, res) => {
