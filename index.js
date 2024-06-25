@@ -42,29 +42,18 @@ app.get("/", (req, res) => {
 
 //get scrped result
 app.get("/result", async (req, res) => {
-    const page = parseInt(req.query.page) || 1; // Page number, default to 1
-    const limit = parseInt(req.query.limit) || 10; // Number of results per page, default to 10
-
     try {
-        const skip = (page - 1) * limit;
-        const total = await Scrape.countDocuments(); // Total number of documents in the collection
-        const result = await Scrape.find().skip(skip).limit(limit); // Fetch documents for the current page
-
-        res.status(200).send({
-            status: true,
-            result: result,
-            total: total,
-            page: page,
-            pages: Math.ceil(total / limit) // Calculate total number of pages
-        });
+        const result = await Scrape.find()
+        res.status(200).send({ status: true, result: result })
     } catch (error) {
-        res.status(500).send({ status: false, error: error.message }); // Handle internal server error
+        res.status(400).send({ status: false, error: error })
     }
-});
+})
+
 async function loadEntities() {
     try {
         // Update the URL to the actual location of your /exceldata/getjson endpoint
-        const response = await axios.get('https://digitalbackend-f362d91cd976.herokuapp.com/exceldata/getjson');
+        const response = await axios.get('http://localhost:5000/exceldata/getjson');
         return response.data;
     } catch (error) {
         console.error('Failed to fetch entities:', error);
@@ -156,6 +145,123 @@ async function scrapeEntity(entity, scrapedResults) {
         scrapedResults.push({ Bedrijfsnaam: entity.Bedrijfsnaam, categories, error: error.message });
     }
 }
+
+// // Scraping route
+// app.get("/scrape", async (req, res) => {
+//     let scrapedResults = [];
+//     let processedEntities = 0;
+//     console.log(entities.length)
+//     for (let entity of entities) {
+//         let categories = ['Winkels', 'Horeca', 'Verenigingen', 'Bedrijven', 'Evenementen'].filter(category => entity[category] === 'x');
+//         try {
+//             // Prepare Actor input for fetching business details
+//             const businessDetailsInput = {
+//                 startUrls: [{ url: entity.Facebookadres }],
+//                 resultsLimit: 1,
+//             };
+
+//             // Run the Actor to fetch business details
+//             const businessDetailsRun = await apifyClient.actor("KoJrdxJCTtpon81KY").call(businessDetailsInput);
+
+//             if (businessDetailsRun && businessDetailsRun.defaultDatasetId) {
+//                 const { items: businessDetails } = await apifyClient.dataset(businessDetailsRun.defaultDatasetId).listItems();
+
+//                 // Prepare Actor input for fetching latest post
+//                 const latestPostInput = {
+//                     startUrls: [{ url: `${entity.Facebookadres}/posts` }],
+//                     resultsLimit: 1,
+//                 };
+
+//                 // Run the Actor to fetch latest post
+//                 const latestPostRun = await apifyClient.actor("KoJrdxJCTtpon81KY").call(latestPostInput);
+
+//                 if (latestPostRun && latestPostRun.defaultDatasetId) {
+//                     const { items: latestPost } = await apifyClient.dataset(latestPostRun.defaultDatasetId).listItems();
+
+//                     // Create a new instance of the Scrape model
+//                     const existingScrape = await Scrape.findOneAndUpdate(
+//                         { Bedrijfsnaam: entity.Bedrijfsnaam },
+//                         {
+//                             Bedrijfsnaam: entity.Bedrijfsnaam,
+//                             categories,
+//                             businessDetails,
+//                             latestPost
+//                         },
+//                         { upsert: true, new: true }
+//                     );
+//                     scrapedResults.push(existingScrape);
+//                     processedEntities++;
+//                     console.log(`${processedEntities}/${entities.length} completed.`)
+                                   
+//                 }
+//             }
+//         } catch (error) {
+//             console.error('Scraping error for:', entity.Bedrijfsnaam, error);
+//             scrapedResults.push({ Bedrijfsnaam: entity.Bedrijfsnaam, categories, error: error.message });
+//         }
+//     }
+
+//     // Respond with the scraped data
+//     res.json(scrapedResults);
+// });
+// app.get("/scrape", async (req, res) => {
+//     const totalEntities = entities.length;
+//     let processedEntities = 0;
+//     let scrapedResults = [];
+//     console.log(totalEntities)
+
+//     try {
+//         const scrapePromises = entities.map(async (entity) => {
+//             let categories = ['Winkels', 'Horeca', 'Verenigingen', 'Bedrijven', 'Evenementen'].filter(category => entity[category] === 'x');
+
+//             const businessDetailsInput = {
+//                 startUrls: [{ url: entity.Facebookadres }],
+//                 resultsLimit: 1,
+//             };
+
+//             const latestPostInput = {
+//                 startUrls: [{ url: `${entity.Facebookadres}/posts` }],
+//                 resultsLimit: 1,
+//             };
+
+//             const [businessDetailsRun, latestPostRun] = await Promise.all([
+//                 apifyClient.actor("KoJrdxJCTtpon81KY").call(businessDetailsInput),
+//                 apifyClient.actor("KoJrdxJCTtpon81KY").call(latestPostInput)
+//             ]);
+
+//             if (businessDetailsRun && businessDetailsRun.defaultDatasetId && latestPostRun && latestPostRun.defaultDatasetId) {
+//                 const [businessDetailsResponse, latestPostResponse] = await Promise.all([
+//                     apifyClient.dataset(businessDetailsRun.defaultDatasetId).listItems(),
+//                     apifyClient.dataset(latestPostRun.defaultDatasetId).listItems()
+//                 ]);
+
+//                 const existingScrape = await Scrape.findOneAndUpdate(
+//                     { Bedrijfsnaam: entity.Bedrijfsnaam },
+//                     {
+//                         Bedrijfsnaam: entity.Bedrijfsnaam,
+//                         categories,
+//                         businessDetails: businessDetailsResponse.items,
+//                         latestPost: latestPostResponse.items
+//                     },
+//                     { upsert: true, new: true }
+//                 );
+//                 processedEntities++;
+//                 console.log(`${processedEntities}/${totalEntities} completed.`)
+//                 return existingScrape;
+//             }
+//         });
+
+//         scrapedResults = await Promise.all(scrapePromises.filter(p => p));
+//     } catch (error) {
+//         console.error('Scraping error:', error);
+//         res.status(500).json({ error: 'An error occurred during scraping.' });
+//         return;
+//     }
+
+//     const progressPercentage = Math.round((processedEntities / totalEntities) * 100);
+
+//     res.json({ progress: progressPercentage, data: scrapedResults });
+// });
 
 
 // Starting the server
