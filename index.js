@@ -29,6 +29,7 @@ mongoose.connect(process.env.MONGO_URL, {
 }).then(() => console.log("Connected to Database")).catch((err) => console.warn(err));
 const excel = require('./routes/excelfile')
 const auth = require('./routes/user')
+const result = require('./routes/result')
 
 app.use('/exceldata', excel)
 app.use('/auth', auth)
@@ -41,15 +42,8 @@ app.get("/", (req, res) => {
 });
 
 //get scrped result
-app.get("/result", async (req, res) => {
-    try {
-        console.log("Fetching results...");
-        const result = await Scrape.find().lean();
-        res.status(200).send({ status: true, result: result })
-    } catch (error) {
-        res.status(400).send({ status: false, error: error })
-    }
-})
+app.use('/result', result)
+
 
 async function loadEntities() {
     try {
