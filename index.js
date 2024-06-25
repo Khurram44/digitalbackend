@@ -43,7 +43,7 @@ app.get("/", (req, res) => {
 //get scrped result
 app.get("/result", async (req, res) => {
     try {
-        const result = await Scrape.find()
+        const result = await Scrape.find().lean();
         res.status(200).send({ status: true, result: result })
     } catch (error) {
         res.status(400).send({ status: false, error: error })
@@ -66,7 +66,7 @@ app.get("/scrape", async (req, res) => {
     let scrapedResults = [];
     let processedEntities = 0;
     console.log(entities.length);
-    
+
     // Iterate through entities
     for (let i = 0; i < entities.length; i += 2) {
         const entity1 = entities[i];
@@ -192,7 +192,7 @@ async function scrapeEntity(entity, scrapedResults) {
 //                     scrapedResults.push(existingScrape);
 //                     processedEntities++;
 //                     console.log(`${processedEntities}/${entities.length} completed.`)
-                                   
+
 //                 }
 //             }
 //         } catch (error) {
