@@ -43,6 +43,7 @@ app.get("/", (req, res) => {
 //get scrped result
 app.get("/result", async (req, res) => {
     try {
+        console.log("Fetching results...");
         const result = await Scrape.find().lean();
         res.status(200).send({ status: true, result: result })
     } catch (error) {

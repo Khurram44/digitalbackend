@@ -5,7 +5,7 @@
       "src": "index.js",
       "use": "@now/node",
       "config": {
-        "maxDuration": 60
+        "maxDuration": 120
       }
     }
   ],
