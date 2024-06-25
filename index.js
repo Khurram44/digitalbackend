@@ -30,9 +30,13 @@ mongoose.connect(process.env.MONGO_URL, {
 const excel = require('./routes/excelfile')
 const auth = require('./routes/user')
 const result = require('./routes/result')
+const scrape = require('./routes/scrape')
+
 
 app.use('/exceldata', excel)
 app.use('/auth', auth)
+app.use('/scrape', scrape)
+
 // Load your data
 // const entities = JSON.parse(fs.readFileSync('data.json', 'utf8'));
 
@@ -45,218 +49,101 @@ app.get("/", (req, res) => {
 app.use('/result', result)
 
 
-async function loadEntities() {
-    try {
-        // Update the URL to the actual location of your /exceldata/getjson endpoint
-        const response = await axios.get('http://localhost:5000/exceldata/getjson');
-        return response.data;
-    } catch (error) {
-        console.error('Failed to fetch entities:', error);
-        return [];  // Return an empty array or handle the error as needed
-    }
-}
-app.get("/scrape", async (req, res) => {
-    const entities = await loadEntities();  // Fetch entities right before they are needed
-
-    let scrapedResults = [];
-    let processedEntities = 0;
-    console.log(entities.length);
-
-    // Iterate through entities
-    for (let i = 0; i < entities.length; i += 2) {
-        const entity1 = entities[i];
-        const entity2 = entities[i + 1];
-
-        // Acquire the semaphore to control concurrency
-        await semaphore.acquire();
-
-        // Create promises for scraping both entities
-        const scrapePromises = [];
-        if (entity1) {
-            scrapePromises.push(scrapeEntity(entity1, scrapedResults));
-            processedEntities++;
-            console.log(`${processedEntities}/${entities.length} completed.`);
-        }
-        if (entity2) {
-            scrapePromises.push(scrapeEntity(entity2, scrapedResults));
-            processedEntities++;
-            console.log(`${processedEntities}/${entities.length} completed.`);
-        }
-
-        // Wait for both scraping operations to finish before releasing the semaphore
-        await Promise.all(scrapePromises);
-
-        // Release the semaphore
-        semaphore.release();
-        semaphore.release();
-    }
-
-    // Respond with the scraped data
-    res.json(scrapedResults);
-});
-
-async function scrapeEntity(entity, scrapedResults) {
-    let categories = ['Winkels', 'Horeca', 'Verenigingen', 'Bedrijven', 'Evenementen'].filter(category => entity[category] === 'x');
-    try {
-        // Prepare Actor input for fetching business details
-        const businessDetailsInput = {
-            startUrls: [{ url: entity.Facebookadres }],
-            resultsLimit: 1,
-        };
-        // Run the Actor to fetch business details
-        const businessDetailsRun = await apifyClient.actor("KoJrdxJCTtpon81KY").call(businessDetailsInput);
-
-        if (businessDetailsRun && businessDetailsRun.defaultDatasetId) {
-            const { items: businessDetails } = await apifyClient.dataset(businessDetailsRun.defaultDatasetId).listItems();
-
-            // Prepare Actor input for fetching latest post
-            const latestPostInput = {
-                startUrls: [{ url: `${entity.Facebookadres}/posts` }],
-                resultsLimit: 1,
-            };
-
-            // Run the Actor to fetch latest post
-            const latestPostRun = await apifyClient.actor("KoJrdxJCTtpon81KY").call(latestPostInput);
-
-            if (latestPostRun && latestPostRun.defaultDatasetId) {
-                const { items: latestPost } = await apifyClient.dataset(latestPostRun.defaultDatasetId).listItems();
-
-                // Create a new instance of the Scrape model
-                const existingScrape = await Scrape.findOneAndUpdate(
-                    { Bedrijfsnaam: entity.Bedrijfsnaam },
-                    {
-                        Bedrijfsnaam: entity.Bedrijfsnaam,
-                        categories,
-                        businessDetails,
-                        latestPost
-                    },
-                    { upsert: true, new: true }
-                );
-                scrapedResults.push(existingScrape);
-            }
-        }
-    } catch (error) {
-        console.error('Scraping error for:', entity.Bedrijfsnaam, error);
-        scrapedResults.push({ Bedrijfsnaam: entity.Bedrijfsnaam, categories, error: error.message });
-    }
-}
-
-// // Scraping route
+// async function loadEntities() {
+//     try {
+//         // Update the URL to the actual location of your /exceldata/getjson endpoint
+//         const response = await axios.get('http://localhost:5000/exceldata/getjson');
+//         return response.data;
+//     } catch (error) {
+//         console.error('Failed to fetch entities:', error);
+//         return [];  // Return an empty array or handle the error as needed
+//     }
+// }
 // app.get("/scrape", async (req, res) => {
+//     const entities = await loadEntities();  // Fetch entities right before they are needed
+
 //     let scrapedResults = [];
 //     let processedEntities = 0;
-//     console.log(entities.length)
-//     for (let entity of entities) {
-//         let categories = ['Winkels', 'Horeca', 'Verenigingen', 'Bedrijven', 'Evenementen'].filter(category => entity[category] === 'x');
-//         try {
-//             // Prepare Actor input for fetching business details
-//             const businessDetailsInput = {
-//                 startUrls: [{ url: entity.Facebookadres }],
-//                 resultsLimit: 1,
-//             };
+//     console.log(entities.length);
 
-//             // Run the Actor to fetch business details
-//             const businessDetailsRun = await apifyClient.actor("KoJrdxJCTtpon81KY").call(businessDetailsInput);
+//     // Iterate through entities
+//     for (let i = 0; i < entities.length; i += 2) {
+//         const entity1 = entities[i];
+//         const entity2 = entities[i + 1];
 
-//             if (businessDetailsRun && businessDetailsRun.defaultDatasetId) {
-//                 const { items: businessDetails } = await apifyClient.dataset(businessDetailsRun.defaultDatasetId).listItems();
+//         // Acquire the semaphore to control concurrency
+//         await semaphore.acquire();
 
-//                 // Prepare Actor input for fetching latest post
-//                 const latestPostInput = {
-//                     startUrls: [{ url: `${entity.Facebookadres}/posts` }],
-//                     resultsLimit: 1,
-//                 };
-
-//                 // Run the Actor to fetch latest post
-//                 const latestPostRun = await apifyClient.actor("KoJrdxJCTtpon81KY").call(latestPostInput);
-
-//                 if (latestPostRun && latestPostRun.defaultDatasetId) {
-//                     const { items: latestPost } = await apifyClient.dataset(latestPostRun.defaultDatasetId).listItems();
-
-//                     // Create a new instance of the Scrape model
-//                     const existingScrape = await Scrape.findOneAndUpdate(
-//                         { Bedrijfsnaam: entity.Bedrijfsnaam },
-//                         {
-//                             Bedrijfsnaam: entity.Bedrijfsnaam,
-//                             categories,
-//                             businessDetails,
-//                             latestPost
-//                         },
-//                         { upsert: true, new: true }
-//                     );
-//                     scrapedResults.push(existingScrape);
-//                     processedEntities++;
-//                     console.log(`${processedEntities}/${entities.length} completed.`)
-
-//                 }
-//             }
-//         } catch (error) {
-//             console.error('Scraping error for:', entity.Bedrijfsnaam, error);
-//             scrapedResults.push({ Bedrijfsnaam: entity.Bedrijfsnaam, categories, error: error.message });
+//         // Create promises for scraping both entities
+//         const scrapePromises = [];
+//         if (entity1) {
+//             scrapePromises.push(scrapeEntity(entity1, scrapedResults));
+//             processedEntities++;
+//             console.log(`${processedEntities}/${entities.length} completed.`);
 //         }
+//         if (entity2) {
+//             scrapePromises.push(scrapeEntity(entity2, scrapedResults));
+//             processedEntities++;
+//             console.log(`${processedEntities}/${entities.length} completed.`);
+//         }
+
+//         // Wait for both scraping operations to finish before releasing the semaphore
+//         await Promise.all(scrapePromises);
+
+//         // Release the semaphore
+//         semaphore.release();
+//         semaphore.release();
 //     }
 
 //     // Respond with the scraped data
 //     res.json(scrapedResults);
 // });
-// app.get("/scrape", async (req, res) => {
-//     const totalEntities = entities.length;
-//     let processedEntities = 0;
-//     let scrapedResults = [];
-//     console.log(totalEntities)
 
+// async function scrapeEntity(entity, scrapedResults) {
+//     let categories = ['Winkels', 'Horeca', 'Verenigingen', 'Bedrijven', 'Evenementen'].filter(category => entity[category] === 'x');
 //     try {
-//         const scrapePromises = entities.map(async (entity) => {
-//             let categories = ['Winkels', 'Horeca', 'Verenigingen', 'Bedrijven', 'Evenementen'].filter(category => entity[category] === 'x');
+//         // Prepare Actor input for fetching business details
+//         const businessDetailsInput = {
+//             startUrls: [{ url: entity.Facebookadres }],
+//             resultsLimit: 1,
+//         };
+//         // Run the Actor to fetch business details
+//         const businessDetailsRun = await apifyClient.actor("KoJrdxJCTtpon81KY").call(businessDetailsInput);
 
-//             const businessDetailsInput = {
-//                 startUrls: [{ url: entity.Facebookadres }],
-//                 resultsLimit: 1,
-//             };
+//         if (businessDetailsRun && businessDetailsRun.defaultDatasetId) {
+//             const { items: businessDetails } = await apifyClient.dataset(businessDetailsRun.defaultDatasetId).listItems();
 
+//             // Prepare Actor input for fetching latest post
 //             const latestPostInput = {
 //                 startUrls: [{ url: `${entity.Facebookadres}/posts` }],
 //                 resultsLimit: 1,
 //             };
 
-//             const [businessDetailsRun, latestPostRun] = await Promise.all([
-//                 apifyClient.actor("KoJrdxJCTtpon81KY").call(businessDetailsInput),
-//                 apifyClient.actor("KoJrdxJCTtpon81KY").call(latestPostInput)
-//             ]);
+//             // Run the Actor to fetch latest post
+//             const latestPostRun = await apifyClient.actor("KoJrdxJCTtpon81KY").call(latestPostInput);
 
-//             if (businessDetailsRun && businessDetailsRun.defaultDatasetId && latestPostRun && latestPostRun.defaultDatasetId) {
-//                 const [businessDetailsResponse, latestPostResponse] = await Promise.all([
-//                     apifyClient.dataset(businessDetailsRun.defaultDatasetId).listItems(),
-//                     apifyClient.dataset(latestPostRun.defaultDatasetId).listItems()
-//                 ]);
+//             if (latestPostRun && latestPostRun.defaultDatasetId) {
+//                 const { items: latestPost } = await apifyClient.dataset(latestPostRun.defaultDatasetId).listItems();
 
+//                 // Create a new instance of the Scrape model
 //                 const existingScrape = await Scrape.findOneAndUpdate(
 //                     { Bedrijfsnaam: entity.Bedrijfsnaam },
 //                     {
 //                         Bedrijfsnaam: entity.Bedrijfsnaam,
 //                         categories,
-//                         businessDetails: businessDetailsResponse.items,
-//                         latestPost: latestPostResponse.items
+//                         businessDetails,
+//                         latestPost
 //                     },
 //                     { upsert: true, new: true }
 //                 );
-//                 processedEntities++;
-//                 console.log(`${processedEntities}/${totalEntities} completed.`)
-//                 return existingScrape;
+//                 scrapedResults.push(existingScrape);
 //             }
-//         });
-
-//         scrapedResults = await Promise.all(scrapePromises.filter(p => p));
+//         }
 //     } catch (error) {
-//         console.error('Scraping error:', error);
-//         res.status(500).json({ error: 'An error occurred during scraping.' });
-//         return;
+//         console.error('Scraping error for:', entity.Bedrijfsnaam, error);
+//         scrapedResults.push({ Bedrijfsnaam: entity.Bedrijfsnaam, categories, error: error.message });
 //     }
-
-//     const progressPercentage = Math.round((processedEntities / totalEntities) * 100);
-
-//     res.json({ progress: progressPercentage, data: scrapedResults });
-// });
+// }
 
 
 // Starting the server
