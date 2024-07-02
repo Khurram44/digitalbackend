@@ -38,9 +38,12 @@ router.post('/upload', upload.single('file'), async (req, res) => {
                     Horeca: row['Horeca'] === 'x',
                     Verenigingen: row['Verenigingen'] === 'x',
                     Bedrijven: row['Bedrijven'] === 'x',
-                    Evenementen: row['Evenementen'] === 'x'
+                    Evenementen: row['Evenementen'] === 'x',
+                    Lifestyle: row['Lifestyle'] === 'x',
+                    Recreatie: row['Recreatie'] === 'x',
+                    Sport: row['Sport'] === 'x',
+                    Cultuur: row['Cultuur'] === 'x',
                 });
-
                 // Save the new business
                 await newBusiness.save();
                 newCount++;

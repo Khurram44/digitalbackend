@@ -29,7 +29,23 @@ const businessSchema = new Schema({
     Evenementen: {
         type: Boolean,
         default: false
-    }
+    },
+    Lifestyle: {
+        type: Boolean,
+        default: false
+    },
+    Recreatie: {
+        type: Boolean,
+        default: false
+    },
+    Sport: {
+        type: Boolean,
+        default: false
+    },
+    Cultuur: {
+        type: Boolean,
+        default: false
+    },
 });
 
 const Business = mongoose.model('Business', businessSchema);

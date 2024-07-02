@@ -3,10 +3,10 @@ const env = require("dotenv");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const { ApifyClient } = require('apify-client');
-const fs = require('fs');
 const Scrape = require("./models/scrape");
 const { Semaphore } = require('async-mutex');
 const axios = require('axios');
+const fs = require('fs').promises;
 // Define the maximum concurrency
 const MAX_CONCURRENCY = 2;
 const semaphore = new Semaphore(MAX_CONCURRENCY);
@@ -49,12 +49,41 @@ app.get("/result", async (req, res) => {
         res.status(400).send({ status: false, error: error })
     }
 })
+app.delete("/result", async (req, res) => {
+    try {
+        await Scrape.deleteMany({});
+        res.status(200).send({ status: true, message: "All results have been deleted." });
+    } catch (error) {
+        res.status(500).send({ status: false, error: error.message });
+    }
+});
 
+// async function loadEntities() {
+//     try {
+//         // Update the URL to the actual location of your /exceldata/getjson endpoint
+//         const response = await axios.get('http://localhost:5000/exceldata/getjson');
+//         return response.data;
+//     } catch (error) {
+//         console.error('Failed to fetch entities:', error);
+//         return [];  // Return an empty array or handle the error as needed
+//     }
+// }
+async function loadEntitiesFromFile(filename) {
+    try {
+        const data = await fs.readFile(filename, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        console.error('Error loading entities from file:', error);
+        throw error;  // Handle or propagate the error as needed
+    }
+}
+
+// Modify loadEntities() to use the file loading function
 async function loadEntities() {
     try {
-        // Update the URL to the actual location of your /exceldata/getjson endpoint
-        const response = await axios.get('http://localhost:5000/exceldata/getjson');
-        return response.data;
+        // Assuming ex.json is in the same directory as this script
+        const entities = await loadEntitiesFromFile('./ex.json');
+        return entities;
     } catch (error) {
         console.error('Failed to fetch entities:', error);
         return [];  // Return an empty array or handle the error as needed
@@ -101,7 +130,7 @@ app.get("/scrape", async (req, res) => {
 });
 
 async function scrapeEntity(entity, scrapedResults) {
-    let categories = ['Winkels', 'Horeca', 'Verenigingen', 'Bedrijven', 'Evenementen'].filter(category => entity[category] === 'x');
+    let categories = ['Winkels', 'Horeca', 'Verenigingen', 'Bedrijven', 'Evenementen','Lifestyle','Recreatie','Sport','Cultuur'].filter(category => entity[category] === 'x');
     try {
         // Prepare Actor input for fetching business details
         const businessDetailsInput = {
@@ -110,18 +139,15 @@ async function scrapeEntity(entity, scrapedResults) {
         };
         // Run the Actor to fetch business details
         const businessDetailsRun = await apifyClient.actor("KoJrdxJCTtpon81KY").call(businessDetailsInput);
-
         if (businessDetailsRun && businessDetailsRun.defaultDatasetId) {
             const { items: businessDetails } = await apifyClient.dataset(businessDetailsRun.defaultDatasetId).listItems();
-
             // Prepare Actor input for fetching latest post
             const latestPostInput = {
                 startUrls: [{ url: `${entity.Facebookadres}/posts` }],
                 resultsLimit: 1,
             };
-
             // Run the Actor to fetch latest post
-            const latestPostRun = await apifyClient.actor("4Hv5RhChiaDk6iwad").call(latestPostInput);
+            const latestPostRun = await apifyClient.actor("KoJrdxJCTtpon81KY").call(latestPostInput);
 
             if (latestPostRun && latestPostRun.defaultDatasetId) {
                 const { items: latestPost } = await apifyClient.dataset(latestPostRun.defaultDatasetId).listItems();
