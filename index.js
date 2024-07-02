@@ -43,7 +43,7 @@ app.get("/", (req, res) => {
 //get scrped result
 app.get("/result", async (req, res) => {
     try {
-        const result = await Scrape.find()
+        const result = await Scrape.find().sort({ createdAt: -1 }) // replace 'createdAt' with your timestamp field
         res.status(200).send({ status: true, result: result })
     } catch (error) {
         res.status(400).send({ status: false, error: error })
