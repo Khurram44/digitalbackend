@@ -29,9 +29,17 @@ mongoose.connect(process.env.MONGO_URL, {
 }).then(() => console.log("Connected to Database")).catch((err) => console.warn(err));
 const excel = require('./routes/excelfile')
 const auth = require('./routes/user')
+const favorite = require('./routes/favourite')
+const addcompany = require('./routes/addCompany')
+const category = require('./routes/category');
+
 
 app.use('/exceldata', excel)
 app.use('/auth', auth)
+app.use('/company', addcompany)
+app.use('/favourite', favorite)
+app.use('/categories', category);
+
 // Load your data
 // const entities = JSON.parse(fs.readFileSync('data.json', 'utf8'));
 
