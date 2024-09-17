@@ -51,12 +51,18 @@ app.get("/", (req, res) => {
 //get scrped result
 app.get("/result", async (req, res) => {
     try {
-        const result = await Scrape.find().sort({ createdAt: -1 }) // replace 'createdAt' with your timestamp field
-        res.status(200).send({ status: true, result: result })
+        const result = await Scrape.aggregate([
+            {
+                $sort: { "latestPost.time": -1 } // Sort based on the `time` field in `latestPost`
+            },
+        ]);
+
+        res.status(200).send({ status: true, result: result });
     } catch (error) {
-        res.status(400).send({ status: false, error: error })
+        res.status(400).send({ status: false, error: error });
     }
-})
+});
+
 app.delete("/result", async (req, res) => {
     try {
         await Scrape.deleteMany({});
