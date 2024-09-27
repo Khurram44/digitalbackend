@@ -3,6 +3,80 @@ const AddCompany = require("../models/addCompany")
 const axios = require('axios');
 const sendEmail = require('../emailService'); // Adjust the path as needed
 
+// router.post('/add-company', async (req, res) => {
+//     try {
+//         const {
+//             bedrijfsnaam,
+//             Facebookadres,
+//             contactperson,
+//             email,
+//             categories // Expecting categories array from the request
+//         } = req.body;
+
+//         if (!bedrijfsnaam || !Facebookadres || !contactperson || !email) {
+//             return res.status(400).json({ message: 'All fields are required.' });
+//         }
+
+//         // Fetch valid categories from your categories API
+//         const validCategoriesResponse = await axios.get('https://digitalbackend-production.up.railway.app/categories/');
+//         const validCategories = validCategoriesResponse.data;
+
+//         // Prepare the dynamic categories object
+//         const selectedCategories = {};
+
+//         // Initialize all categories with empty string
+//         validCategories.forEach(cat => {
+//             selectedCategories[cat.name] = ''; // Start with empty string
+//         });
+
+//         // Update the categories based on the request
+//         categories.forEach(cat => {
+//             if (selectedCategories.hasOwnProperty(cat)) {
+//                 selectedCategories[cat] = 'x'; // Set to 'x' if selected
+//             }
+//         });
+
+//         // Create the new company document
+//         const newCompany = new AddCompany({
+//             bedrijfsnaam,
+//             Facebookadres,
+//             contactperson,
+//             email,
+//             categories: selectedCategories // Store as a dynamic object
+//         });
+
+//         // Save to the database
+//         const savedCompany = await newCompany.save();
+
+//         // Send email to the user
+//         await sendEmail(
+//             email,
+//             'Company Registration Received',
+//             'companyRegistration',
+//             { bedrijfsnaam }
+//         );
+
+//         // Send email to the admin
+//         await sendEmail(
+//             process.env.GMAIL_USER,
+//             'New Company Registration',
+//             'adminNotification',
+//             { bedrijfsnaam, contactperson }
+//         );
+//          // Return success response
+//           res.status(201).json({
+//             status: true,
+//             message: 'Company successfully added.',
+//             company: savedCompany
+//         });
+//     } catch (err) {
+//         if (err.code === 11000) {
+//             return res.status(409).json({ message: 'Email already registered.' });
+//         }
+//         res.status(500).json({ message: 'Server error', error: err.message });
+//     }
+// });
+
 router.post('/add-company', async (req, res) => {
     try {
         const {
@@ -10,8 +84,11 @@ router.post('/add-company', async (req, res) => {
             Facebookadres,
             contactperson,
             email,
-            categories // Expecting categories array from the request
+            categories // Expecting categories from the request
         } = req.body;
+
+        // Ensure categories is an array, default to an empty array if not provided
+        const validCategories = Array.isArray(categories) ? categories : [];
 
         if (!bedrijfsnaam || !Facebookadres || !contactperson || !email) {
             return res.status(400).json({ message: 'All fields are required.' });
@@ -19,20 +96,24 @@ router.post('/add-company', async (req, res) => {
 
         // Fetch valid categories from your categories API
         const validCategoriesResponse = await axios.get('https://digitalbackend-production.up.railway.app/categories/');
-        const validCategories = validCategoriesResponse.data;
+        const allValidCategories = validCategoriesResponse.data;
 
-        // Prepare the dynamic categories object
+        if (!allValidCategories || allValidCategories.length === 0) {
+            return res.status(500).json({ message: 'Unable to fetch valid categories.' });
+        }
+
+        // Prepare the dynamic categories object with boolean values
         const selectedCategories = {};
 
-        // Initialize all categories with empty string
-        validCategories.forEach(cat => {
-            selectedCategories[cat.name] = ''; // Start with empty string
+        // Initialize all valid categories to false
+        allValidCategories.forEach(cat => {
+            selectedCategories[cat.name] = false; // Start with false
         });
 
-        // Update the categories based on the request
-        categories.forEach(cat => {
+        // Update the categories based on the request, ensuring only valid categories are allowed
+        validCategories.forEach(cat => {
             if (selectedCategories.hasOwnProperty(cat)) {
-                selectedCategories[cat] = 'x'; // Set to 'x' if selected
+                selectedCategories[cat] = true; // Set to true if category is valid and selected
             }
         });
 
@@ -63,19 +144,28 @@ router.post('/add-company', async (req, res) => {
             'adminNotification',
             { bedrijfsnaam, contactperson }
         );
-         // Return success response
-          res.status(201).json({
-            status: true,
-            message: 'Company successfully added.',
-            company: savedCompany
+
+        // Return success response with the desired format
+        return res.status(201).json({
+            status:true,
+            ...selectedCategories, // Spread the selected categories into the response
+            _id: savedCompany._id,
+            Bedrijfsnaam: savedCompany.bedrijfsnaam,
+            Facebookadres: savedCompany.Facebookadres,
+            __v: savedCompany.__v // Include the version key if necessary
         });
     } catch (err) {
+        // Handle unique email error
         if (err.code === 11000) {
             return res.status(409).json({ message: 'Email already registered.' });
         }
-        res.status(500).json({ message: 'Server error', error: err.message });
+        // General server error
+        return res.status(500).json({ message: 'Server error', error: err.message });
     }
 });
+
+
+
 
 // Get All Company
 

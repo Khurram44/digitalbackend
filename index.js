@@ -7,6 +7,23 @@ const Scrape = require("./models/scrape");
 const { Semaphore } = require('async-mutex');
 const axios = require('axios');
 const fs = require('fs').promises;
+const { createClient } = require('redis');
+const cron = require('node-cron');
+
+const client = createClient({
+    url: process.env.REDIS_URL || 'redis://localhost:6379',
+    legacyMode: true});
+
+client.on('error', (err) => console.error('Redis Client Error', err));
+
+async function connectToRedis() {
+    try {
+        await client.connect();
+        console.log("Connected to Redis");
+    } catch (err) {
+        console.error("Could not connect to Redis", err);
+    }
+}
 // Define the maximum concurrency
 const MAX_CONCURRENCY = 2;
 const semaphore = new Semaphore(MAX_CONCURRENCY);
@@ -27,11 +44,13 @@ mongoose.connect(process.env.MONGO_URL, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
 }).then(() => console.log("Connected to Database")).catch((err) => console.warn(err));
+
 const excel = require('./routes/excelfile')
 const auth = require('./routes/user')
 const favorite = require('./routes/favourite')
 const addcompany = require('./routes/addCompany')
 const category = require('./routes/category');
+const sendEmail = require("./emailService");
 
 
 app.use('/exceldata', excel)
@@ -48,40 +67,136 @@ app.get("/", (req, res) => {
     res.json({ message: "Welcome to the Digital Backend API!" });
 });
 
+app.get("/cron/history", async (req, res) => {
+    try {
+        const history = await CronJob.find().sort({ createdAt: -1 }); // Sort by most recent
+        res.status(200).send({ status: true, history });
+    } catch (error) {
+        res.status(500).send({ status: false, error: error.message });
+    }
+});
+
+let isProcessing = false; // To track if the job is currently processing
+
+app.get("/cron/status", (req, res) => {
+    if (isProcessing) {
+        res.status(200).send({ status: "processing" });
+    } else {
+        res.status(200).send({ status: "next run at: [insert time]" });
+    }
+});
+
+// Schedule cron job at 12 PM and 12 AM Netherlands time
+cron.schedule('0 0,12 * * *', async () => {
+    const startTime = new Date();
+    let isProcessing = true;
+
+    try {
+        // Send an email when the cron job starts
+        await sendEmail('Cron Job Started', 'The cron job has started', startTime);
+
+        // Call the /scrape API instead of calling the scraping function directly
+        const response = await axios.get('https://digitalbackend-production.up.railway.app/scrape');
+
+        // If the request is successful, log the data
+        const scrapedData = response.data;
+        console.log('Scraped data:', scrapedData);
+
+        const endTime = new Date();
+        const duration = endTime - startTime;
+
+        // Create a new CronJob record
+        await new CronJob({ startTime, endTime, duration, status: 'success', data: scrapedData }).save();
+
+        // Send an email when the cron job completes successfully
+        await sendEmail('Cron Job Completed', 'The cron job completed successfully.', startTime, endTime, duration);
+
+    } catch (error) {
+        const endTime = new Date();
+        const duration = endTime - startTime;
+
+        // Log the error and create a CronJob record with failure status
+        console.error('Error during scraping:', error.message);
+        await new CronJob({ startTime, endTime, duration, status: 'failed', errorMessage: error.message }).save();
+
+        // Send an email if the cron job fails
+        await sendEmail('Cron Job Failed', `The cron job failed with error: ${error.message}`, startTime, endTime, duration);
+    } finally {
+        isProcessing = false; // Reset the processing flag
+    }
+}, {
+    scheduled: true,
+    timezone: "Europe/Amsterdam"  // Set timezone to Netherlands time (CET/CEST)
+});
+
+
 //get scrped result
+// app.get("/result", async (req, res) => {
+//     try {
+        
+//         const result = await Scrape.aggregate([
+//             {
+//                 $sort: { "latestPost.time": -1 } // Sort based on the `time` field in `latestPost`
+//             },
+//         ]);
+
+//         res.status(200).send({ status: true, result: result });
+//     } catch (error) {
+//         res.status(400).send({ status: false, error: error });
+//     }
+// });
+
 app.get("/result", async (req, res) => {
     try {
-        const result = await Scrape.aggregate([
-            {
-                $sort: { "latestPost.time": -1 } // Sort based on the `time` field in `latestPost`
-            },
-        ]);
+        // Try to get the results from Redis
+        const cachedResults = await client.get('scrapedResults');
 
-        res.status(200).send({ status: true, result: result });
+        if (cachedResults) {
+            // If results are found in cache, return them
+            res.status(200).send({ status: true, result: JSON.parse(cachedResults) });
+        } else {
+            // If no results in cache, fetch from database as a fallback
+            const result = await Scrape.aggregate([
+                {
+                    $sort: { "latestPost.time": -1 } // Sort based on the `time` field in `latestPost`
+                },
+            ]);
+
+            res.status(200).send({ status: true, result: result });
+        }
     } catch (error) {
         res.status(400).send({ status: false, error: error });
     }
 });
 
+
 app.delete("/result", async (req, res) => {
     try {
+        
         await Scrape.deleteMany({});
         res.status(200).send({ status: true, message: "All results have been deleted." });
     } catch (error) {
         res.status(500).send({ status: false, error: error.message });
     }
 });
+app.delete("/result/:id", async (req, res) => {
+    const { id } = req.params; // Get the ID from the URL parameters
 
-// async function loadEntities() {
-//     try {
-//         // Update the URL to the actual location of your /exceldata/getjson endpoint
-//         const response = await axios.get('http://localhost:5000/exceldata/getjson');
-//         return response.data;
-//     } catch (error) {
-//         console.error('Failed to fetch entities:', error);
-//         return [];  // Return an empty array or handle the error as needed
-//     }
-// }
+    try {
+        const deletedResult = await Scrape.findByIdAndDelete(id); // Find the document by ID and delete it
+
+        if (deletedResult) {
+            res.status(200).send({ status: true, message: "Result has been deleted.", data: deletedResult });
+        } else {
+            res.status(404).send({ status: false, message: "No result found with this ID." });
+        }
+    } catch (error) {
+        res.status(500).send({ status: false, error: error.message });
+    }
+});
+
+
+
 async function loadEntitiesFromFile(filename) {
     try {
         const data = await fs.readFile(filename, 'utf8');
@@ -93,14 +208,33 @@ async function loadEntitiesFromFile(filename) {
 }
 
 // Modify loadEntities() to use the file loading function
+
+// async function loadEntities() {
+//     try {
+//         // Assuming ex.json is in the same directory as this script
+//         const entities = await loadEntitiesFromFile('./ex.json');
+//         return entities;
+//     } catch (error) {
+//         console.error('Failed to fetch entities:', error);
+//         return [];  // Return an empty array or handle the error as needed
+//     }
+// }
+
 async function loadEntities() {
     try {
-        // Assuming ex.json is in the same directory as this script
-        const entities = await loadEntitiesFromFile('./ex.json');
-        return entities;
+        // Make an API call to fetch entities
+        const response = await axios.get('https://digitalbackend-production.up.railway.app/exceldata/getjson');
+        
+        // Check if the response is successful and return the data
+        if (response.status === 200) {
+            return response.data; // Adjust this if your API returns data differently
+        } else {
+            console.error('Failed to fetch entities:', response.statusText);
+            return []; // Return an empty array or handle the error as needed
+        }
     } catch (error) {
         console.error('Failed to fetch entities:', error);
-        return [];  // Return an empty array or handle the error as needed
+        return []; // Return an empty array or handle the error as needed
     }
 }
 app.get("/scrape", async (req, res) => {
@@ -109,7 +243,7 @@ app.get("/scrape", async (req, res) => {
     let scrapedResults = [];
     let processedEntities = 0;
     console.log(entities.length);
-    
+
     // Iterate through entities
     for (let i = 0; i < entities.length; i += 2) {
         const entity1 = entities[i];
@@ -138,47 +272,48 @@ app.get("/scrape", async (req, res) => {
         semaphore.release();
         semaphore.release();
     }
-
+    // Store the scraped results in Redis
+    await client.set('scrapedResults', JSON.stringify(scrapedResults));
     // Respond with the scraped data
     res.json(scrapedResults);
 });
 
 async function scrapeEntity(entity, scrapedResults) {
-    let categories = ['Winkels', 'Horeca', 'Verenigingen', 'Bedrijven', 'Evenementen','Lifestyle','Recreatie','Sport','Cultuur'].filter(category => entity[category] === 'x');
+    let categories = ['Winkels', 'Horeca', 'Verenigingen', 'Bedrijven', 'Evenementen', 'Lifestyle', 'Recreatie', 'Sport', 'Cultuur'].filter(category => entity[category] === 'x');
+
     try {
-        // Prepare Actor input for fetching business details
+        // Fetch business details
         const businessDetailsInput = {
             startUrls: [{ url: entity.Facebookadres }],
             resultsLimit: 1,
         };
-        // Run the Actor to fetch business details
         const businessDetailsRun = await apifyClient.actor("KoJrdxJCTtpon81KY").call(businessDetailsInput);
-        if (businessDetailsRun && businessDetailsRun.defaultDatasetId) {
-            const { items: businessDetails } = await apifyClient.dataset(businessDetailsRun.defaultDatasetId).listItems();
-            // Prepare Actor input for fetching latest post
-            const latestPostInput = {
-                startUrls: [{ url: `${entity.Facebookadres}/posts` }],
-                resultsLimit: 1,
-            };
-            // Run the Actor to fetch latest post
-            const latestPostRun = await apifyClient.actor("KoJrdxJCTtpon81KY").call(latestPostInput);
+        const businessDetails = businessDetailsRun && businessDetailsRun.defaultDatasetId ? await apifyClient.dataset(businessDetailsRun.defaultDatasetId).listItems() : [];
 
-            if (latestPostRun && latestPostRun.defaultDatasetId) {
-                const { items: latestPost } = await apifyClient.dataset(latestPostRun.defaultDatasetId).listItems();
+        // Fetch latest post
+        const latestPostInput = {
+            startUrls: [{ url: `${entity.Facebookadres}/posts` }],
+            resultsLimit: 1,
+        };
+        const latestPostRun = await apifyClient.actor("KoJrdxJCTtpon81KY").call(latestPostInput);
+        const latestPost = latestPostRun && latestPostRun.defaultDatasetId ? await apifyClient.dataset(latestPostRun.defaultDatasetId).listItems() : [];
 
-                // Create a new instance of the Scrape model
-                const existingScrape = await Scrape.findOneAndUpdate(
-                    { Bedrijfsnaam: entity.Bedrijfsnaam },
-                    {
-                        Bedrijfsnaam: entity.Bedrijfsnaam,
-                        categories,
-                        businessDetails,
-                        latestPost
-                    },
-                    { upsert: true, new: true }
-                );
-                scrapedResults.push(existingScrape);
-            }
+        // Upsert the entry in the database
+        const existingScrape = await Scrape.findOneAndUpdate(
+            { Bedrijfsnaam: entity.Bedrijfsnaam },
+            {
+                Bedrijfsnaam: entity.Bedrijfsnaam,
+                categories,
+                businessDetails,
+                latestPost,
+            },
+            { upsert: true, new: true }
+        );
+
+        // Avoid duplicates by checking existing scraped results
+        const existingIndex = scrapedResults.findIndex(result => result.Bedrijfsnaam === existingScrape.Bedrijfsnaam);
+        if (existingIndex === -1) {
+            scrapedResults.push(existingScrape);
         }
     } catch (error) {
         console.error('Scraping error for:', entity.Bedrijfsnaam, error);
@@ -186,124 +321,8 @@ async function scrapeEntity(entity, scrapedResults) {
     }
 }
 
-// // Scraping route
-// app.get("/scrape", async (req, res) => {
-//     let scrapedResults = [];
-//     let processedEntities = 0;
-//     console.log(entities.length)
-//     for (let entity of entities) {
-//         let categories = ['Winkels', 'Horeca', 'Verenigingen', 'Bedrijven', 'Evenementen'].filter(category => entity[category] === 'x');
-//         try {
-//             // Prepare Actor input for fetching business details
-//             const businessDetailsInput = {
-//                 startUrls: [{ url: entity.Facebookadres }],
-//                 resultsLimit: 1,
-//             };
-
-//             // Run the Actor to fetch business details
-//             const businessDetailsRun = await apifyClient.actor("KoJrdxJCTtpon81KY").call(businessDetailsInput);
-
-//             if (businessDetailsRun && businessDetailsRun.defaultDatasetId) {
-//                 const { items: businessDetails } = await apifyClient.dataset(businessDetailsRun.defaultDatasetId).listItems();
-
-//                 // Prepare Actor input for fetching latest post
-//                 const latestPostInput = {
-//                     startUrls: [{ url: `${entity.Facebookadres}/posts` }],
-//                     resultsLimit: 1,
-//                 };
-
-//                 // Run the Actor to fetch latest post
-//                 const latestPostRun = await apifyClient.actor("KoJrdxJCTtpon81KY").call(latestPostInput);
-
-//                 if (latestPostRun && latestPostRun.defaultDatasetId) {
-//                     const { items: latestPost } = await apifyClient.dataset(latestPostRun.defaultDatasetId).listItems();
-
-//                     // Create a new instance of the Scrape model
-//                     const existingScrape = await Scrape.findOneAndUpdate(
-//                         { Bedrijfsnaam: entity.Bedrijfsnaam },
-//                         {
-//                             Bedrijfsnaam: entity.Bedrijfsnaam,
-//                             categories,
-//                             businessDetails,
-//                             latestPost
-//                         },
-//                         { upsert: true, new: true }
-//                     );
-//                     scrapedResults.push(existingScrape);
-//                     processedEntities++;
-//                     console.log(`${processedEntities}/${entities.length} completed.`)
-                                   
-//                 }
-//             }
-//         } catch (error) {
-//             console.error('Scraping error for:', entity.Bedrijfsnaam, error);
-//             scrapedResults.push({ Bedrijfsnaam: entity.Bedrijfsnaam, categories, error: error.message });
-//         }
-//     }
-
-//     // Respond with the scraped data
-//     res.json(scrapedResults);
-// });
-// app.get("/scrape", async (req, res) => {
-//     const totalEntities = entities.length;
-//     let processedEntities = 0;
-//     let scrapedResults = [];
-//     console.log(totalEntities)
-
-//     try {
-//         const scrapePromises = entities.map(async (entity) => {
-//             let categories = ['Winkels', 'Horeca', 'Verenigingen', 'Bedrijven', 'Evenementen'].filter(category => entity[category] === 'x');
-
-//             const businessDetailsInput = {
-//                 startUrls: [{ url: entity.Facebookadres }],
-//                 resultsLimit: 1,
-//             };
-
-//             const latestPostInput = {
-//                 startUrls: [{ url: `${entity.Facebookadres}/posts` }],
-//                 resultsLimit: 1,
-//             };
-
-//             const [businessDetailsRun, latestPostRun] = await Promise.all([
-//                 apifyClient.actor("KoJrdxJCTtpon81KY").call(businessDetailsInput),
-//                 apifyClient.actor("KoJrdxJCTtpon81KY").call(latestPostInput)
-//             ]);
-
-//             if (businessDetailsRun && businessDetailsRun.defaultDatasetId && latestPostRun && latestPostRun.defaultDatasetId) {
-//                 const [businessDetailsResponse, latestPostResponse] = await Promise.all([
-//                     apifyClient.dataset(businessDetailsRun.defaultDatasetId).listItems(),
-//                     apifyClient.dataset(latestPostRun.defaultDatasetId).listItems()
-//                 ]);
-
-//                 const existingScrape = await Scrape.findOneAndUpdate(
-//                     { Bedrijfsnaam: entity.Bedrijfsnaam },
-//                     {
-//                         Bedrijfsnaam: entity.Bedrijfsnaam,
-//                         categories,
-//                         businessDetails: businessDetailsResponse.items,
-//                         latestPost: latestPostResponse.items
-//                     },
-//                     { upsert: true, new: true }
-//                 );
-//                 processedEntities++;
-//                 console.log(`${processedEntities}/${totalEntities} completed.`)
-//                 return existingScrape;
-//             }
-//         });
-
-//         scrapedResults = await Promise.all(scrapePromises.filter(p => p));
-//     } catch (error) {
-//         console.error('Scraping error:', error);
-//         res.status(500).json({ error: 'An error occurred during scraping.' });
-//         return;
-//     }
-
-//     const progressPercentage = Math.round((processedEntities / totalEntities) * 100);
-
-//     res.json({ progress: progressPercentage, data: scrapedResults });
-// });
-
-
+// Connect to Redis
+connectToRedis();
 // Starting the server
 app.listen(process.env.PORT, () => {
     console.log("Server started");
