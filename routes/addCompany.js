@@ -95,7 +95,7 @@ router.post('/add-company', async (req, res) => {
         }
 
         // Fetch valid categories from your categories API
-        const validCategoriesResponse = await axios.get('https://digitalbackend-production.up.railway.app/categories/');
+        const validCategoriesResponse = await axios.get('https://digitalbackend-production-bfa4.up.railway.app/categories/');
         const allValidCategories = validCategoriesResponse.data;
 
         if (!allValidCategories || allValidCategories.length === 0) {
@@ -132,7 +132,6 @@ router.post('/add-company', async (req, res) => {
         // Send email to the user
         await sendEmail(
             email,
-            'Company Registration Received',
             'companyRegistration',
             { bedrijfsnaam }
         );
@@ -140,7 +139,7 @@ router.post('/add-company', async (req, res) => {
         // Send email to the admin
         await sendEmail(
             process.env.GMAIL_USER,
-            'New Company Registration',
+            'Nieuwe Bedrijfsregistratie',
             'adminNotification',
             { bedrijfsnaam, contactperson }
         );
@@ -216,12 +215,12 @@ router.post('/accept-company/:id', async (req, res) => {
         // Send email notification to the user
         await sendEmail(
             company.email,
-            'Company Registration Accepted',
+            'Bedrijfsregistratie Geaccepteerd',
             'companyAccepted', // You can create this EJS template
             { bedrijfsnaam: company.bedrijfsnaam }
         );
 
-        res.status(200).json({ message: 'Company accepted successfully', company });
+        res.status(200).json({ message: 'Bedrijf succesvol geaccepteerd', company });
     } catch (err) {
         res.status(500).json({ message: 'Server error', error: err.message });
     }
@@ -242,12 +241,12 @@ router.post('/reject-company/:id', async (req, res) => {
         // Send email notification to the user
         await sendEmail(
             company.email,
-            'Company Registration Rejected',
+            'Bedrijfsregistratie Geweerd',
             'companyRejected', // You can create this EJS template
             { bedrijfsnaam: company.bedrijfsnaam }
         );
 
-        res.status(200).json({ message: 'Company rejected successfully', company });
+        res.status(200).json({ message: 'Bedrijf succesvol geweigerd', company });
     } catch (err) {
         res.status(500).json({ message: 'Server error', error: err.message });
     }

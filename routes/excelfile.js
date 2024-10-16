@@ -30,7 +30,11 @@ router.post('/upload', upload.single('file'), async (req, res) => {
                     skipCount++;
                     continue;
                 }
-
+                //Categories GET here
+                // const categories = await category.find()
+                // const businessCategories = categories.map(m=>{
+                //     m.
+                // })
                 // Create a new business record
                 const newBusiness = new Business({
                     Bedrijfsnaam: row['Bedrijfsnaam'],
@@ -83,6 +87,11 @@ router.get('/getjson', async (req, res) => {
                 Verenigingen: company.categories.get('Verenigingen') === "true",
                 Bedrijven: company.categories.get('Bedrijven') === "true",
                 Evenementen: company.categories.get('Evenementen') === "true",
+                Lifestyle: company.categories.get('Lifestyle') === "true",
+                Recreatie: company.categories.get('Recreatie') === "true",
+                Sport: company.categories.get('Sport') === "true",
+                Cultuur: company.categories.get('Cultuur') === "true",
+
                 __v: company.__v,
             };
         });
