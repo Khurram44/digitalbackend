@@ -3,11 +3,17 @@ const ejs = require('ejs');
 const path = require('path');
 const fs = require('fs');
 // Set up your email transport configuration
+
 const transporter = nodemailer.createTransport({
-    service: 'Gmail',
+    host: 'mail.allesintubbergen.nl', 
+    port: 587,
+    secure: false, 
     auth: {
         user: process.env.GMAIL_USER,
         pass: process.env.GMAIL_PASS
+    },
+    tls: {
+        rejectUnauthorized: false 
     }
 });
 

@@ -1,6 +1,29 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
+const businessSchema = new Schema({
+    Bedrijfsnaam: {
+        type: String,
+        required: true
+    },
+    Facebookadres: {
+        type: String,
+        required: true
+    },
+    categories: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Category'  // Reference to the Category model
+    }]
+});
+
+const Business = mongoose.model('Business', businessSchema);
+
+module.exports = Business;
+
+
+// const mongoose = require('mongoose');
+// const Schema = mongoose.Schema;
+
 // const businessSchema = new Schema({
 //     Bedrijfsnaam: {
 //         type: String,
@@ -48,21 +71,24 @@ const Schema = mongoose.Schema;
 //     },
 // });
 
-const businessSchema = new Schema({
-        Bedrijfsnaam: {
-        type: String,
-        required: true
-    },
-    Facebookadres: {
-        type: String,
-        required: true
-    },
-    categories:[{
-        type: mongoose.Schema.Types.ObjectId,
-        ref:"Category"
-    }
-    ]
-})
-const Business = mongoose.model('Business', businessSchema);
 
-module.exports = Business;
+// const Business = mongoose.model('Business', businessSchema);
+
+// module.exports = Business;
+
+
+// const businessSchema = new Schema({
+//     Bedrijfsnaam: {
+//     type: String,
+//     required: true
+// },
+// Facebookadres: {
+//     type: String,
+//     required: true
+// },
+// categories:[{
+//     type: mongoose.Schema.Types.ObjectId,
+//     ref:"Category"
+// }
+// ]
+// })

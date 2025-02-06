@@ -3,58 +3,143 @@ const multer = require('multer');
 const XLSX = require('xlsx');
 const Business = require('../models/excelfile');  // Import your Business model
 const addCompany = require('../models/addCompany');
+const category = require('../models/category');
+const { default: mongoose } = require('mongoose');
 
 // Configure multer to use memory storage
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
+
+// router.post('/upload', upload.single('file'), async (req, res) => {
+//     if (req.file) {
+//         try {
+//             // Read the Excel file
+//             const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+//             const sheetName = workbook.SheetNames[0];
+//             const worksheet = workbook.Sheets[sheetName];
+//             const rows = XLSX.utils.sheet_to_json(worksheet);
+
+//             let newCount = 0;
+//             let skipCount = 0;
+
+//             // Retrieve all available categories from the Category model
+//             const categories = await category.find();
+//             const categoryMap = new Map(categories.map(cat => [cat.name.toLowerCase(), cat._id]));
+
+//             for (const row of rows) {
+//                 // Check if the business already exists
+//                 const existingBusiness = await Business.findOne({ Bedrijfsnaam: row['Bedrijfsnaam'] });
+//                 if (existingBusiness) {
+//                     skipCount++;
+//                     continue;
+//                 }
+
+//                 // Dynamically assign categories from the row data
+//                 const businessCategories = [];
+//                 for (const categoryName in row) {
+//                     if (row[categoryName] === 'x' && categoryMap.has(categoryName.toLowerCase())) {
+//                         businessCategories.push(categoryMap.get(categoryName.toLowerCase()));
+//                     }
+//                 }
+
+//                 const newBusiness = new Business({
+//                     Bedrijfsnaam: row['Bedrijfsnaam'],
+//                     Facebookadres: row['Facebookadres'],
+//                     categories: businessCategories
+//                 });
+
+//                 await newBusiness.save();
+//                 newCount++;
+//             }
+
+//             res.send(`File uploaded. ${newCount} new records added, ${skipCount} duplicates skipped.`);
+//         } catch (err) {
+//             console.error(err);
+//             res.status(500).send(err.message);
+//         }
+//     } else {
+//         res.status(400).send('No file uploaded.');
+//     }
+// });
 router.post('/upload', upload.single('file'), async (req, res) => {
     if (req.file) {
         try {
-            // Read the Excel file from the buffer
+            // Read the Excel file
             const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
             const sheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[sheetName];
             const rows = XLSX.utils.sheet_to_json(worksheet);
 
-            // Initialize a counter for new and skipped records
             let newCount = 0;
             let skipCount = 0;
+            let missingCategories = [];
+            const uploadedFacebookadresSet = new Set(); // Set to track Facebookadres in the uploaded sheet
 
-            // Process each row and save to MongoDB
+            // Retrieve all available categories from the Category model
+            const categories = await category.find();
+            const categoryMap = new Map(categories.map(cat => [cat.name.toLowerCase(), cat._id]));
+
+            const businessesToSave = []; // Array to hold businesses to save
+
             for (const row of rows) {
-                // Check if business already exists
-                const existingBusiness = await Business.findOne({ Bedrijfsnaam: row['Bedrijfsnaam'] });
-                if (existingBusiness) {
-                    // Increment skip count and continue to the next iteration
-                    skipCount++;
-                    continue;
+                const businessCategories = [];
+                let isBusinessValid = true; // Flag to determine if the business is valid
+
+                for (const categoryName in row) {
+                    if (row[categoryName] === 'x') {
+                        const lowerCaseCategory = categoryName.toLowerCase();
+                        if (categoryMap.has(lowerCaseCategory)) {
+                            businessCategories.push(categoryMap.get(lowerCaseCategory));
+                        } else {
+                            if (!missingCategories.includes(categoryName)) {
+                                missingCategories.push(categoryName);
+                                isBusinessValid = false;
+                            }
+                        }
+                    }
                 }
-                //Categories GET here
-                // const categories = await category.find()
-                // const businessCategories = categories.map(m=>{
-                //     m.
-                // })
-                // Create a new business record
-                const newBusiness = new Business({
-                    Bedrijfsnaam: row['Bedrijfsnaam'],
-                    Facebookadres: row['Facebookadres'],
-                    Winkels: row['Winkels'] === 'x',
-                    Horeca: row['Horeca'] === 'x',
-                    Verenigingen: row['Verenigingen'] === 'x',
-                    Bedrijven: row['Bedrijven'] === 'x',
-                    Evenementen: row['Evenementen'] === 'x',
-                    Lifestyle: row['Lifestyle'] === 'x',
-                    Recreatie: row['Recreatie'] === 'x',
-                    Sport: row['Sport'] === 'x',
-                    Cultuur: row['Cultuur'] === 'x',
-                });
-                // Save the new business
-                await newBusiness.save();
+
+                const facebookadres = row['Facebookadres'];
+                if (!facebookadres) {
+                    continue; // Skip rows with no Facebookadres
+                }
+
+                // Check if the Facebookadres already exists in the database or in the uploaded sheet
+                const existingBusiness = await Business.findOne({ Facebookadres: facebookadres });
+                
+                if (existingBusiness || uploadedFacebookadresSet.has(facebookadres)) {
+                    skipCount++;
+                    continue; // Skip duplicate Facebookadres
+                }
+
+                // Mark this Facebookadres as processed in the uploaded sheet
+                uploadedFacebookadresSet.add(facebookadres);
+
+                // If the business is valid, prepare it for saving
+                if (isBusinessValid) {
+                    businessesToSave.push(new Business({
+                        Bedrijfsnaam: row['Bedrijfsnaam'],
+                        Facebookadres: facebookadres,
+                        categories: businessCategories
+                    }));
+                }
+            }
+
+            if (missingCategories.length > 0) {
+                return res.status(400).send(
+                    `The following categories are missing: ${missingCategories.join(', ')}. Please add these categories to the system before proceeding.`
+                );
+            }
+
+            // Save all valid businesses
+            for (const business of businessesToSave) {
+                await business.save();
                 newCount++;
             }
 
-            res.send(`File uploaded. ${newCount} new records added, ${skipCount} duplicates skipped.`);
+            // Send success response
+            res.status(200).send({ status: true, message: `${newCount} new records added, ${skipCount} duplicates skipped.` });
         } catch (err) {
             console.error(err);
             res.status(500).send(err.message);
@@ -64,43 +149,44 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     }
 });
 
+
+
+
+
+
+
+
 router.get('/getjson', async (req, res) => {
     try {
-        // Fetch accepted companies from the AddCompany model
-        const acceptedCompanies = await addCompany.find({ accepted: 'accepted' });
+        // Fetch accepted companies and populate the 'categories' field with category names
+        const acceptedCompanies = await addCompany.find({ accepted: 'accepted' })
+            .populate('categories', 'name'); // Populate category names
 
-        // Fetch all businesses from the Business model
-        const businesses = await Business.find({});
+        // Log accepted companies for debugging
+        console.log('Accepted Companies:', acceptedCompanies);
 
-        // Transform the AddCompany documents to match the Business structure
-        const transformedCompanies = acceptedCompanies.map(company => {
-            console.log("Company Categories:", company.categories); // Debugging
+        // Fetch all businesses and populate 'categories' field
+        const businesses = await Business.find({}).populate('categories', 'name');
 
-            return {
-                _id: company._id,
-                Bedrijfsnaam: company.bedrijfsnaam,
-                Facebookadres: company.Facebookadres || company.email, // Use Facebookadres or email if missing
+        // Format businesses to return only category names
+        const businessesWithFormattedCategories = businesses.map(business => ({
+            ...business.toObject(),
+            categories: business.categories.map(category => category.name) // Extract category names
+        }));
 
-                // Use the get() method to access values from the Map
-                Winkels: company.categories.get('Winkels') === "true",
-                Horeca: company.categories.get('Horeca') === "true",
-                Verenigingen: company.categories.get('Verenigingen') === "true",
-                Bedrijven: company.categories.get('Bedrijven') === "true",
-                Evenementen: company.categories.get('Evenementen') === "true",
-                Lifestyle: company.categories.get('Lifestyle') === "true",
-                Recreatie: company.categories.get('Recreatie') === "true",
-                Sport: company.categories.get('Sport') === "true",
-                Cultuur: company.categories.get('Cultuur') === "true",
+        const acceptedCompaniesWithFormattedCategories = acceptedCompanies.map(company => ({
+            ...company.toObject(),
+            categories: company.categories.map(category => category ? category.name : null) // Handle null categories
+        }));
 
-                __v: company.__v,
-            };
-        });
+        // Combine accepted companies and businesses into a single array
+        const combinedData = [...acceptedCompaniesWithFormattedCategories, ...businessesWithFormattedCategories];
 
-        // Combine the transformed companies into the businesses array
-        const mergedBusinesses = businesses.concat(transformedCompanies);
+        // Log the combined data to check the final output
+        console.log('Combined Data:', combinedData);
 
-        // Return the merged array of businesses
-        res.status(200).json(mergedBusinesses);
+        // Send response
+        res.status(200).json(combinedData);
     } catch (err) {
         console.error(err);
         res.status(500).send(err.message);
@@ -108,24 +194,83 @@ router.get('/getjson', async (req, res) => {
 });
 
 
-// Edit
 router.put('/update/:id', async (req, res) => {
     const { id } = req.params;
-    const updateData = req.body;
+    const { Bedrijfsnaam, Facebookadres, categories } = req.body;
+
+    // Validate required fields
+    if (!Bedrijfsnaam || !Facebookadres) {
+        return res.status(400).json({ message: 'Bedrijfsnaam and Facebookadres are required' });
+    }
 
     try {
-        const updatedBusiness = await Business.findByIdAndUpdate(id, updateData, { new: true });
+        // Check if the business or company exists
+        const business = await Business.findById(id);
+        const company = await addCompany.findById(id);
 
-        if (updatedBusiness) {
-            res.json({ message: 'Business updated successfully', data: updatedBusiness });
-        } else {
-            res.status(404).send({ message: 'Business not found' });
+        if (!business && !company) {
+            return res.status(404).json({ message: 'Business or Company not found' });
         }
+
+        // If categories are passed as names, find the corresponding ObjectIds
+        let categoryIds = [];
+        if (categories && categories.length > 0) {
+            const categoryDocuments = await category.find({ name: { $in: categories } }).select('_id');
+            categoryIds = categoryDocuments.map(cat => cat._id);
+
+            if (categoryIds.length === 0) {
+                return res.status(404).json({ message: 'Some or all categories not found' });
+            }
+        }
+
+        // Update the business if it exists
+        let updatedBusiness = null;
+        if (business) {
+            updatedBusiness = await Business.findByIdAndUpdate(
+                id,
+                { Bedrijfsnaam, Facebookadres, categories: categoryIds.length > 0 ? categoryIds : business.categories },
+                { new: true }
+            ).populate('categories');  // Populating categories directly in the query
+        }
+
+        // Update the company if it exists
+        let updatedCompany = null;
+        if (company) {
+            updatedCompany = await addCompany.findByIdAndUpdate(
+                id,
+                { Bedrijfsnaam, Facebookadres, categories: categoryIds.length > 0 ? categoryIds : company.categories },
+                { new: true }
+            ).populate('categories');  // Populating categories directly in the query
+        }
+
+        // Format the categories for both company and business (if they exist) to return names instead of ObjectIds
+        const formattedUpdatedBusiness = updatedBusiness ? {
+            ...updatedBusiness.toObject(),
+            categories: updatedBusiness.categories.map(category => category.name)
+        } : null;
+
+        const formattedUpdatedCompany = updatedCompany ? {
+            ...updatedCompany.toObject(),
+            categories: updatedCompany.categories.map(category => category.name)
+        } : null;
+
+        // Return the updated document(s)
+        res.json({
+            status: true,
+            message: 'Update successful',
+            data: {
+                updatedBusiness: formattedUpdatedBusiness,
+                updatedCompany: formattedUpdatedCompany
+            }
+        });
     } catch (err) {
-        console.error(err);
-        res.status(500).send({ message: err.message });
+        console.error('Error occurred during update:', err);
+        res.status(500).json({ message: 'Server error' });
     }
 });
+
+
+
 
 // Route to delete all businesses and companies
 router.delete('/delete-all', async (req, res) => {

@@ -6,7 +6,7 @@ const addCompanySchema = new mongoose.Schema({
         required: true,
         unique: true,
     },
-    bedrijfsnaam: {
+    Bedrijfsnaam: {
         type: String,
         required: true,
     },
@@ -14,19 +14,15 @@ const addCompanySchema = new mongoose.Schema({
         type: String,
         required: true,
     },
-    categories: {
-        type: Map, // This stores categories as key-value pairs
-        of: String, // Value will be 'x' or empty string
-        default: {}  // Default to an empty object
-    },
-    email: {
-        type: String,
-        required: true,
-        unique: true
-    },
+    categories: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Category',  // Reference to Category model
+        required: true
+    }],
     Facebookadres: {
         type: String,
         required: true,
+        unique: true,
     },
     accepted: {
         type: String, // Can be 'pending', 'accepted', or 'rejected'
