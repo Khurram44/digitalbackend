@@ -42,10 +42,11 @@ client.on('error', (err) => console.error('Redis Client Error', err));
 
 async function connectToRedis() {
     try {
+        console.log('Attempting to connect to Redis with URL:', process.env.REDIS_URL);
         await client.connect();
-        console.log("Connected to Redis");
+        console.log('Connected to Redis');
     } catch (err) {
-        console.error("Could not connect to Redis", err);
+        console.error('Could not connect to Redis:', err);
     }
 }
 // Initialize the ApifyClient with API token
@@ -84,7 +85,7 @@ res.send(d)
 })
 const { performance } = require('perf_hooks');
 const sendEmail = require("./emailService");
-const { cronSchedule } = require("./cron");
+const { cronSchedule, scrapeFunction } = require("./cron");
 const Progress = require("./models/progress");
 
 cronSchedule(io)
@@ -130,80 +131,73 @@ app.get("/result/cache", async (req, res) => {
 
 
 
+app.post('/scrape', async (req, res) => {
+    try {
+        console.log("Scrape API called");
+        console.log("Request Body:", req.body); // Log the request body to verify the input
 
+        // Call the scrapeFunction with a mock `io` object
+        const result = await scrapeFunction({ emit: () => {} });
 
-// API to get results directly from MongoDB without using Redis cache
+        // Log the result of the scraping process
+        console.log("Scraping Result:", result);
 
-// app.get("/result/cache", async (req, res) => {
-//     const start = performance.now();
+        // Send the response back to the client
+        res.status(200).json({ 
+            status: "success", 
+            message: "Scraping completed", 
+            data: result 
+        });
+    } catch (error) {
+        console.error("Error in /scrape endpoint:", error);
 
-//     try {
-//         // Step 1: Check for cached data
-//         const cacheStart = performance.now();
-        
-//         client.get('scrapedResults', async (err, rest) => {
-//             if (err) {
-//                 console.error('Error fetching from Redis:', err);
-//                 return res.status(400).send({ status: false, res: "YES", error: err });
-//             }  
-//             if (rest) {
-//                 console.log('Cached data found:');
-//                 const cacheEnd = performance.now();
-//                 console.log(`Cache hit: ${cacheEnd - start} ms (fetch: ${cacheEnd - cacheStart} ms)`);
-//                 return res.status(200).send({ status: true, res: "YES", result: JSON.parse(rest) });
-//             }
-            
-//             const cacheEnd = performance.now();
-//             console.log(`Cache miss: ${cacheEnd - start} ms (fetch: ${cacheEnd - cacheStart} ms)`);
+        // Send an error response back to the client
+        res.status(500).json({ 
+            status: "error", 
+            message: "Scraping failed", 
+            error: error.message 
+        });
+    }
+});
+app.get('/scrapedata', async (req, res) => {
+    try {
+        const scrapedData = await Scrape.find().sort({ createdAt: -1 }); // Get the latest data first
+        console.log("Scraped Data Retrieved:", scrapedData); // Log the full response
 
-//             // Fetch data from the database
-//             const dbStart = performance.now();
-//             const result = await Scrape.aggregate([{ $sort: { "latestPost.time": -1 } }]);
-//             const dbEnd = performance.now();
-
-//             // Step 3: Store the fetched result in cache
-//             await client.set('scrapedResults', JSON.stringify(result), 'EX', 3600); // Cache with expiration of 1 hour
-//             const totalEnd = performance.now();
-//             console.log(`DB fetch time: ${dbEnd - dbStart} ms`);
-//             console.log(`Cache store time: ${totalEnd - dbEnd} ms`);
-//             console.log(`Total processing time: ${totalEnd - start} ms`);
-
-//             // Return the result
-//             res.status(200).send({ status: true, result: result });
-//         });
-        
-//     } catch (error) {
-//         console.error('Error in /result/cache:', error);
-//         res.status(500).send({ status: false, error: error.message || 'Internal Server Error' });
-//     }
-// });
-
-// app.get("/result", async (req, res) => {
-//     try {
-//         const result = await Scrape.aggregate([
-//             {
-//                 $sort: { "latestPost.time": -1 } // Sort based on the `time` field in `latestPost`
-//             },
-//         ]);
-
-//         res.status(200).send({ status: true, result: result });
-//     } catch (error) {
-//         res.status(400).send({ status: false, error: error.message });
-//     }
-// });
+        res.status(200).json({
+            status: "success",
+            message: "Scraped data retrieved successfully",
+            data: scrapedData
+        });
+    } catch (error) {
+        console.error("Error in /scrape GET endpoint:", error);
+        res.status(500).json({
+            status: "error",
+            message: "Failed to retrieve data",
+            error: error.message
+        });
+    }
+});
 
 app.get("/result", async (req, res) => {
     try {
+        console.log("Fetching results from the database...");
+
+        // Fetch all documents from the Scrape collection (for debugging)
+        const allScrapes = await Scrape.find({});
+        console.log("All Scrapes:", allScrapes);
+
+        // Perform the aggregation
         const result = await Scrape.aggregate([
             {
-                $sort: { "latestPost.time": -1 }
+                $sort: { "latestPost.time": -1 } // Sort by latestPost time (descending)
             },
             {
                 $lookup: {
                     from: "categories",          // The name of your Category collection
                     localField: "categories",    // Field in Scrape model containing category IDs
                     foreignField: "_id",         // Field in Category model to match on
-                    as: "categoryDetails"        // Output array to store matched categories
+                    as: "categoryDetails"       // Output array to store matched categories
                 }
             },
             {
@@ -218,12 +212,15 @@ app.get("/result", async (req, res) => {
             }
         ]);
 
+        console.log("Aggregation Result:", result);
+
+        // Send the response
         res.status(200).send({ status: true, result: result });
     } catch (error) {
+        console.error("Error in /result endpoint:", error);
         res.status(400).send({ status: false, error: error.message });
     }
 });
-
 
 
 
@@ -250,140 +247,6 @@ app.delete("/result/:id", async (req, res) => {
         res.status(500).send({ status: false, error: error.message });
     }
 });
-
-// async function loadEntities() {
-//     try {
-//         // Update the URL to the actual location of your /exceldata/getjson endpoint
-//         const response = await axios.get('http://localhost:5000/exceldata/getjson');
-//         return response.data;
-//     } catch (error) {
-//         console.error('Failed to fetch entities:', error);
-//         return [];  // Return an empty array or handle the error as needed
-//     }
-// }
-async function loadEntitiesFromFile(filename) {
-    try {
-        const data = await fs.readFile(filename, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        console.error('Error loading entities from file:', error);
-        throw error;  // Handle or propagate the error as needed
-    }
-}
-
-// Modify loadEntities() to use the file loading function
-async function loadEntities() {
-    try {
-        // Assuming ex.json is in the same directory as this script
-        const entities = await loadEntitiesFromFile('./ex.json');
-        return entities;
-    } catch (error) {
-        console.error('Failed to fetch entities:', error);
-        return [];  // Return an empty array or handle the error as needed
-    }
-}
-
-app.get("/scrape", async (req, res) => {
-    const entities = [
-        {
-          "_id": "671bccf7e32583248eebd4b3",
-          "Bedrijfsnaam": "Sportvereniging Mariaparochie Voetbal Vereniging 1929",
-          "Facebookadres": "https://www.facebook.com/mvv29harbrinkhoek",
-          "categories": [
-            "Verenigingen",
-            "Sport"
-          ],
-          "__v": 0
-        },
-        {
-          "_id": "671bccf7e32583248eebd4b5",
-          "Bedrijfsnaam": "Steggink Catering & Events",
-          "Facebookadres": "https://www.facebook.com/StegginkCateringEvents",
-          "categories": [
-            "Bedrijven"
-          ],
-          "__v": 0
-        }]
-    // await loadEntities();  // Fetch entities right before they are needed
-
-    let scrapedResults = [];
-    let processedEntities = 0;
-    console.log(entities.length);
-    
-    // Iterate through entities
-    for (let i = 0; i < entities.length; i += 2) {
-        const entity1 = entities[i];
-        const entity2 = entities[i + 1];
-
-        // Acquire the semaphore to control concurrency
-        await semaphore.acquire();
-
-        // Create promises for scraping both entities
-        const scrapePromises = [];
-        if (entity1) {
-            scrapePromises.push(scrapeEntity(entity1, scrapedResults,entity1.categories));
-            processedEntities++;
-            console.log(`${processedEntities}/${entities.length} completed.`);
-        }
-        if (entity2) {
-            scrapePromises.push(scrapeEntity(entity2, scrapedResults,entity2.categories));
-            processedEntities++;
-            console.log(`${processedEntities}/${entities.length} completed.`);
-        }
-
-        // Wait for both scraping operations to finish before releasing the semaphore
-        await Promise.all(scrapePromises);
-
-        // Release the semaphore
-        semaphore.release();
-        semaphore.release();
-    }
-
-    // Respond with the scraped data
-    res.json(scrapedResults);
-});
-
-async function scrapeEntity(entity, scrapedResults,categories) {
-    try { 
-        // Prepare Actor input for fetching business details
-        const businessDetailsInput = {
-            startUrls: [{ url: entity.Facebookadres }],
-            resultsLimit: 1,
-        };
-        // Run the Actor to fetch business details
-        const businessDetailsRun = await apifyClient.actor("KoJrdxJCTtpon81KY").call(businessDetailsInput);
-        if (businessDetailsRun && businessDetailsRun.defaultDatasetId) {
-            const { items: businessDetails } = await apifyClient.dataset(businessDetailsRun.defaultDatasetId).listItems();
-            // Prepare Actor input for fetching latest post
-            const latestPostInput = {
-                startUrls: [{ url: `${entity.Facebookadres}/posts` }],
-                resultsLimit: 1,
-            };
-            // Run the Actor to fetch latest post
-            const latestPostRun = await apifyClient.actor("KoJrdxJCTtpon81KY").call(latestPostInput);
-
-            if (latestPostRun && latestPostRun.defaultDatasetId) {
-                const { items: latestPost } = await apifyClient.dataset(latestPostRun.defaultDatasetId).listItems();
-
-                // Create a new instance of the Scrape model
-                const existingScrape = await Scrape.findOneAndUpdate(
-                    { Bedrijfsnaam: entity.Bedrijfsnaam },
-                    {
-                        Bedrijfsnaam: entity.Bedrijfsnaam,
-                        categories,
-                        businessDetails,
-                        latestPost
-                    },
-                    { upsert: true, new: true }
-                );
-                scrapedResults.push(existingScrape);
-            }
-        }
-    } catch (error) {
-        console.error('Scraping error for:', entity.Bedrijfsnaam, error);
-        scrapedResults.push({ Bedrijfsnaam: entity.Bedrijfsnaam, categories, error: error.message });
-    }
-}
 
 
 // Connect to Redis

@@ -9,10 +9,18 @@ const userSchema = new mongoose.Schema({
         type: Array,
         
     },
-    businessDetails:{
-        type: Array,
+    businessDetails: {
+        type: {
+            name: String,
+            profile_image: String,
+            profile_url: String 
+        },
+        required: true
     },
     latestPost:{
+        type: Array,
+    },
+    images:{
         type: Array,
     }
 },
