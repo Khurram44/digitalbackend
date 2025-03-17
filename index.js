@@ -190,7 +190,7 @@ app.get("/result", async (req, res) => {
         // Perform the aggregation
         const result = await Scrape.aggregate([
             {
-                $sort: { "latestPost.time": -1 } // Sort by latestPost time (descending)
+                $sort: { "latestPost.date": -1 } // Sort by latestPost time (descending)
             },
             {
                 $lookup: {
@@ -211,11 +211,13 @@ app.get("/result", async (req, res) => {
                 }
             }
         ]);
-
-        console.log("Aggregation Result:", result);
+const display = result.filter(fil=> fil.date !=="").map((m,ind)=>{
+                 m.ms = convertToMilliseconds(m.date)
+            return m
+        })
 
         // Send the response
-        res.status(200).send({ status: true, result: result });
+        res.status(200).send({ status: true, result: display.sort((a, b) => b.ms - a.ms) });
     } catch (error) {
         console.error("Error in /result endpoint:", error);
         res.status(400).send({ status: false, error: error.message });
@@ -248,7 +250,7 @@ app.delete("/result/:id", async (req, res) => {
     }
 });
 
-
+// console.log(new Date("23rd January"))
 // Connect to Redis
 connectToRedis();
 //IO connection
@@ -258,6 +260,68 @@ io.on('connection', (socket) => {
       console.log('A user disconnected');
     });
   });
+
+  const moment = require("moment");
+
+function convertToMilliseconds(dateStr) {
+    dateStr = dateStr.trim().replace(/\s+/g, " "); // Normalize spaces
+
+    // Handling relative time (e.g., "1 d", "11h", "25m")
+    const relativeMatch = dateStr.match(/^(\d+)\s*([dhms])$/);
+    if (relativeMatch) {
+        const value = parseInt(relativeMatch[1]);
+        const unit = relativeMatch[2];
+
+        let multiplier = 1;
+        if (unit === "d") multiplier = 24 * 60 * 60 * 1000; // Days to ms
+        if (unit === "h") multiplier = 60 * 60 * 1000;       // Hours to ms
+        if (unit === "m") multiplier = 60 * 1000;            // Minutes to ms
+        if (unit === "s") multiplier = 1000;                 // Seconds to ms
+
+        return Date.now() - value * multiplier; // Convert to past time in ms
+    }
+
+    // Handling absolute dates
+    let parsedDate;
+    if (dateStr.match(/^\d{1,2} \w+ \d{4}$/)) {  
+        parsedDate = moment(dateStr, "DD MMMM YYYY"); // "16 November 2024"
+    } else if (dateStr.match(/^\d{1,2} \w+ at \d{2}:\d{2}$/)) {  
+        parsedDate = moment(dateStr, "DD MMMM [at] HH:mm").year(moment().year()); // "10 March at 23:50"
+    } else if (dateStr.match(/^\d{1,2} \w+$/)) {  
+        parsedDate = moment(dateStr, "DD MMMM").year(moment().year()); // "10 March"
+    } else if (dateStr.match(/^\d{1,2} \w+ \d{4} at \d{2}:\d{2}$/)) {  
+        parsedDate = moment(dateStr, "DD MMMM YYYY [at] HH:mm"); // "10 March 2024 at 23:50"
+    }
+
+    if (parsedDate && parsedDate.isValid()) {
+        return parsedDate.valueOf(); // Convert to milliseconds
+    }
+
+    return null; // If invalid format
+}
+
+// Example dataset (ignoring indexes)
+const dateStrings = [
+    "17 March 2023", "17 March 2023", "17 January", "15 February",
+    "13 February", "11h", "10 March at 23:50", "10 March at 14:42",
+    "10 March at 13:24", "10 March at 03:18", "10 March 2024",
+    "10 February", "1 d", "1d", "1 March at 13:38",
+    "1 July 2023", "1 February", "6 March at 15:50",
+    "5 January 2021", "16 November 2024", "3d", "23 April 2021",
+    "31 October 2024", "25 February at 11:55", "25m","1m"
+];
+
+// Convert all dates to milliseconds
+const convertedDates = dateStrings.map((d) => ({
+    original: d,
+    timestamp: convertToMilliseconds(d)
+}));
+
+// Sort by timestamp (latest first)
+convertedDates.sort((a, b) => b.timestamp - a.timestamp);
+
+// Output sorted results
+console.log(convertedDates);
 
 // Starting the server
 server.listen(process.env.PORT, () => {

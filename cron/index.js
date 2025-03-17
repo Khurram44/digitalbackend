@@ -181,7 +181,7 @@ const cronSchedule = (io) => {
 const scrapeFunction = async (io) => {
     try {
         // Fetch all business entities
-        const entities = await Business.find();
+        const entities = await Business.find().skip(114);
         let scrapedResults = [];
         let processedEntities = 0;
 
@@ -246,7 +246,7 @@ async function scrapeEntity(entity, scrapedResults, categories) {
         console.log(`Scraping URL: ${entity.Facebookadres}`); // Log the URL being scraped
 
         // Make a POST request to your bot's endpoint
-        const response = await axios.post('https://fastaapi.onrender.com/scrape', payload);
+        const response = await axios.post('http://0.0.0.0:8000/scrape', payload);
 
         if (response.data.status === "success") {
             const scrapedData = response.data.results[entity.Facebookadres];
@@ -263,7 +263,8 @@ async function scrapeEntity(entity, scrapedResults, categories) {
                         profile_url: entity.Facebookadres // Add the profile URL here
                     },
                     latestPost: scrapedData.posts,
-                    images: scrapedData.images
+                    images: scrapedData.images,
+                    date: scrapedData.date
                 },
                 { upsert: true, new: true }
             );
