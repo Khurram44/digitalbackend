@@ -185,8 +185,6 @@ app.get("/result", async (req, res) => {
 
         // Fetch all documents from the Scrape collection (for debugging)
         const allScrapes = await Scrape.find({});
-        console.log("All Scrapes:", allScrapes);
-
         // Perform the aggregation
         const result = await Scrape.aggregate([
             {
@@ -217,7 +215,7 @@ const display = result.filter(fil=> fil.date !=="").map((m,ind)=>{
         })
 
         // Send the response
-        res.status(200).send({ status: true, result: display.sort((a, b) => b.ms - a.ms) });
+        res.status(200).send({ status: true, result:resultJSON(display.sort((a, b) => b.ms - a.ms)) });
     } catch (error) {
         console.error("Error in /result endpoint:", error);
         res.status(400).send({ status: false, error: error.message });
@@ -262,6 +260,7 @@ io.on('connection', (socket) => {
   });
 
   const moment = require("moment");
+const { resultJSON } = require("./function/date");
 
 function convertToMilliseconds(dateStr) {
     dateStr = dateStr.trim().replace(/\s+/g, " "); // Normalize spaces

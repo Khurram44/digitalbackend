@@ -181,7 +181,7 @@ const cronSchedule = (io) => {
 const scrapeFunction = async (io) => {
     try {
         // Fetch all business entities
-        const entities = await Business.find().skip(114);
+        const entities = await Business.find();
         let scrapedResults = [];
         let processedEntities = 0;
 
