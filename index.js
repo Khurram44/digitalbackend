@@ -38,7 +38,7 @@ const client = createClient({
     legacyMode: true
 });
 
-client.on('error', (err) => console.error('Redis Client Error', err));
+client.on('error', (err) => {});
 
 async function connectToRedis() {
     try {
@@ -46,7 +46,7 @@ async function connectToRedis() {
         await client.connect();
         console.log('Connected to Redis');
     } catch (err) {
-        console.error('Could not connect to Redis:', err);
+        // console.error('Could not connect to Redis:', err);
     }
 }
 // Initialize the ApifyClient with API token

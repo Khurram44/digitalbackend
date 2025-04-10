@@ -240,16 +240,16 @@ async function scrapeEntity(entity, scrapedResults, categories) {
     try {
         // Prepare the payload for your bot
         const payload = {
-            urls: [entity.Facebookadres] // Ensure only one URL is passed
+            url: [entity.Facebookadres] // Ensure only one URL is passed
         };
 
         console.log(`Scraping URL: ${entity.Facebookadres}`); // Log the URL being scraped
 
         // Make a POST request to your bot's endpoint
-        const response = await axios.post('http://0.0.0.0:8000/scrape', payload);
+        const response = await axios.post('http://localhost:3000/scrape-posts', payload);
 
         if (response.data.status === "success") {
-            const scrapedData = response.data.results[entity.Facebookadres];
+            const scrapedData = response.data.result[0];
 
             // Create a new instance of the Scrape model
             const existingScrape = await Scrape.findOneAndUpdate(
@@ -258,13 +258,13 @@ async function scrapeEntity(entity, scrapedResults, categories) {
                     Bedrijfsnaam: entity.Bedrijfsnaam,
                     categories,
                     businessDetails: {
-                        name: scrapedData.profile.name,
-                        profile_image: scrapedData.profile.profile_image,
+                        name: scrapedData.profileName,
+                        profile_image: scrapedData.profilePicUrl,
                         profile_url: entity.Facebookadres // Add the profile URL here
                     },
-                    latestPost: scrapedData.posts,
-                    images: scrapedData.images,
-                    date: scrapedData.date
+                    latestPost: scrapedData.latestPost,
+                    images: scrapedData.postMedia,
+                    date: scrapedData.postDateTime
                 },
                 { upsert: true, new: true }
             );
