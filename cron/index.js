@@ -178,47 +178,144 @@ const cronSchedule = (io) => {
         });
 }
 
+// const scrapeFunction = async (io) => {
+//     try {
+//         // Fetch all business entities
+//         const entities = await Business.find();
+//         let scrapedResults = [];
+//         let processedEntities = 0;
+
+//         console.log("Total Businesses to Scrape:", entities.length);
+
+//         // Process each entity one by one
+//         for (const entity of entities) {
+//             await semaphore.acquire();
+//             try {
+//                 console.log(`Processing: ${entity.Bedrijfsnaam} - ${entity.Facebookadres}`);
+
+//                 // Extract categories (ensure it's an array)
+//                 const categories = Array.isArray(entity.categories) ? entity.categories : ["Uncategorized"];
+
+//                 // Perform the scraping
+//                 await scrapeEntity(entity, scrapedResults, categories);
+//                 processedEntities++;
+
+//                 console.log(`✅ Processed: ${entity.Bedrijfsnaam}`);
+//                 console.log(`Current scrapedResults count:`, scrapedResults.length);
+
+//                 // Emit real-time progress updates
+//                 io.emit("scrapeProgress", { processed: processedEntities, total: entities.length });
+
+//                 // Update the scraping progress
+//                 await updateProgress("Scraping in process...", entities.length, processedEntities);
+
+//             } catch (error) {
+//                 console.error(`❌ Error scraping ${entity.Bedrijfsnaam}:`, error);
+//             } finally {
+//                 semaphore.release();
+//             }
+//         }
+
+//         console.log("✅ Scraping Completed. Total Results:", scrapedResults.length);
+
+//         // Return the results along with metadata
+//         return { 
+//             total: entities.length, 
+//             processed: processedEntities, 
+//             message: "Scraping completed successfully.",
+//             scrapedResults 
+//         };
+
+//     } catch (error) {
+//         console.error("❌ Scraping failed:", error);
+//         return { 
+//             total: 0, 
+//             processed: 0, 
+//             message: "Scraping failed.",
+//             error: error.message 
+//         };
+//     }
+// };
+// async function scrapeEntity(entity, scrapedResults, categories) {
+//     try {
+//         // Prepare the payload for your bot
+//         const payload = {
+//             url: [entity.Facebookadres] // Ensure only one URL is passed
+//         };
+
+//         console.log(`Scraping URL: ${entity.Facebookadres}`); // Log the URL being scraped
+
+//         // Make a POST request to your bot's endpoint
+//         const response = await axios.post('http://localhost:3000/scrape-posts', payload);
+
+//         if (response.data.status === "success") {
+//             const scrapedData = response.data.result[0];
+
+//             // Create a new instance of the Scrape model
+//             const existingScrape = await Scrape.findOneAndUpdate(
+//                 { Bedrijfsnaam: entity.Bedrijfsnaam },
+//                 {
+//                     Bedrijfsnaam: entity.Bedrijfsnaam,
+//                     categories,
+//                     businessDetails: {
+//                         name: scrapedData.profileName,
+//                         profile_image: scrapedData.profilePicUrl,
+//                         profile_url: entity.Facebookadres // Add the profile URL here
+//                     },
+//                     latestPost: scrapedData.latestPost,
+//                     images: scrapedData.postMedia,
+//                     date: scrapedData.postDateTime
+//                 },
+//                 { upsert: true, new: true }
+//             );
+
+//             console.log(`Scraped data for ${entity.Facebookadres}:`, existingScrape); // Log the scraped data
+//             scrapedResults.push(existingScrape);
+//         } else {
+//             throw new Error("Scraping failed: " + response.data.message);
+//         }
+//     } catch (error) {
+//         console.error('Scraping error for:', entity.Bedrijfsnaam, error);
+//         scrapedResults.push({ Bedrijfsnaam: entity.Bedrijfsnaam, categories, error: error.message });
+//     }
+// }
+
 const scrapeFunction = async (io) => {
     try {
-        // Fetch all business entities
         const entities = await Business.find();
         let scrapedResults = [];
         let processedEntities = 0;
+        const BATCH_SIZE = 1; // Process 3 URLs per API call
 
         console.log("Total Businesses to Scrape:", entities.length);
 
-        // Process each entity one by one
-        for (const entity of entities) {
+        // Process in batches
+        for (let i = 0; i < entities.length; i += BATCH_SIZE) {
             await semaphore.acquire();
             try {
-                console.log(`Processing: ${entity.Bedrijfsnaam} - ${entity.Facebookadres}`);
+                const batch = entities.slice(i, i + BATCH_SIZE);
+                console.log(`Processing batch ${i / BATCH_SIZE + 1}:`, batch.map(e => e.Facebookadres));
 
-                // Extract categories (ensure it's an array)
-                const categories = Array.isArray(entity.categories) ? entity.categories : ["Uncategorized"];
+                // Scrape the batch
+                const batchResults = await scrapeBatch(batch);
+                scrapedResults = [...scrapedResults, ...batchResults];
+                processedEntities += batch.length;
 
-                // Perform the scraping
-                await scrapeEntity(entity, scrapedResults, categories);
-                processedEntities++;
-
-                console.log(`✅ Processed: ${entity.Bedrijfsnaam}`);
-                console.log(`Current scrapedResults count:`, scrapedResults.length);
-
-                // Emit real-time progress updates
-                io.emit("scrapeProgress", { processed: processedEntities, total: entities.length });
-
-                // Update the scraping progress
+                // Progress updates
+                io.emit("scrapeProgress", { 
+                    processed: processedEntities, 
+                    total: entities.length 
+                });
                 await updateProgress("Scraping in process...", entities.length, processedEntities);
 
             } catch (error) {
-                console.error(`❌ Error scraping ${entity.Bedrijfsnaam}:`, error);
+                console.error(`❌ Error processing batch:`, error);
             } finally {
                 semaphore.release();
             }
         }
 
         console.log("✅ Scraping Completed. Total Results:", scrapedResults.length);
-
-        // Return the results along with metadata
         return { 
             total: entities.length, 
             processed: processedEntities, 
@@ -236,48 +333,72 @@ const scrapeFunction = async (io) => {
         };
     }
 };
-async function scrapeEntity(entity, scrapedResults, categories) {
+
+async function scrapeBatch(batch) {
+    const batchResults = [];
+    
     try {
-        // Prepare the payload for your bot
+        // Prepare payload with all batch URLs
         const payload = {
-            url: [entity.Facebookadres] // Ensure only one URL is passed
+            urls: batch.map(entity => entity.Facebookadres).filter(url => url)
         };
 
-        console.log(`Scraping URL: ${entity.Facebookadres}`); // Log the URL being scraped
-
-        // Make a POST request to your bot's endpoint
-        const response = await axios.post('http://localhost:3000/scrape-posts', payload);
+        // Make single API call for the batch
+        const response = await axios.post('http://localhost:3004/scrape-posts', payload);
 
         if (response.data.status === "success") {
-            const scrapedData = response.data.result[0];
+            // Process each result in the batch
+            for (let j = 0; j < batch.length; j++) {
+                const entity = batch[j];
+                const scrapedData = response.data.results[j]; // Get corresponding result
 
-            // Create a new instance of the Scrape model
-            const existingScrape = await Scrape.findOneAndUpdate(
-                { Bedrijfsnaam: entity.Bedrijfsnaam },
-                {
-                    Bedrijfsnaam: entity.Bedrijfsnaam,
-                    categories,
-                    businessDetails: {
-                        name: scrapedData.profileName,
-                        profile_image: scrapedData.profilePicUrl,
-                        profile_url: entity.Facebookadres // Add the profile URL here
-                    },
-                    latestPost: scrapedData.latestPost,
-                    images: scrapedData.postMedia,
-                    date: scrapedData.postDateTime
-                },
-                { upsert: true, new: true }
-            );
+                try {
+                    const categories = Array.isArray(entity.categories) ? 
+                        entity.categories : ["Uncategorized"];
 
-            console.log(`Scraped data for ${entity.Facebookadres}:`, existingScrape); // Log the scraped data
-            scrapedResults.push(existingScrape);
+                    // Save to database
+                    const existingScrape = await Scrape.findOneAndUpdate(
+                        { Bedrijfsnaam: entity.Bedrijfsnaam },
+                        {
+                            Bedrijfsnaam: entity.Bedrijfsnaam,
+                            categories,
+                            businessDetails: {
+                                name: scrapedData.profileName || "",
+                                profile_image: scrapedData.profilePicUrl || "",
+                                profile_url: entity.Facebookadres
+                            },
+                            latestPost: scrapedData.latestPost || [],
+                            images: scrapedData.images || [],
+                            date: scrapedData.date || ""
+                        },
+                        { upsert: true, new: true }
+                    );
+
+                    batchResults.push(existingScrape);
+                    console.log(`✅ Processed ${JSON.stringify(scrapedData)}`);
+                } catch (error) {
+                    console.error(`❌ Failed to save ${entity.Bedrijfsnaam}:`, error);
+                    batchResults.push({ 
+                        Bedrijfsnaam: entity.Bedrijfsnaam, 
+                        error: error.message 
+                    });
+                }
+            }
         } else {
-            throw new Error("Scraping failed: " + response.data.message);
+            throw new Error("Batch scraping failed: " + JSON.stringify(response.data));
         }
     } catch (error) {
-        console.error('Scraping error for:', entity.Bedrijfsnaam, error);
-        scrapedResults.push({ Bedrijfsnaam: entity.Bedrijfsnaam, categories, error: error.message });
+        console.error('Batch scraping error:', error);
+        // Mark all in batch as failed
+        batch.forEach(entity => {
+            batchResults.push({ 
+                Bedrijfsnaam: entity.Bedrijfsnaam, 
+                error: error.message 
+            });
+        });
     }
+
+    return batchResults;
 }
 const updateProgress = async (message, total, processed) => {
     try {
