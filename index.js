@@ -215,7 +215,7 @@ const display = result.filter(fil=> fil.date !=="").map((m,ind)=>{
         })
 
         // Send the response
-        res.status(200).send({ status: true, result:resultJSON(display.sort((a, b) => b.ms - a.ms)) });
+        res.status(200).send({ status: true, result:resultJSON(display.filter(f=> f.ms !== null).sort((a, b) => b.ms - a.ms)) });
     } catch (error) {
         console.error("Error in /result endpoint:", error);
         res.status(400).send({ status: false, error: error.message });
@@ -263,7 +263,8 @@ io.on('connection', (socket) => {
 const { resultJSON } = require("./function/date");
 
 function convertToMilliseconds(dateStr) {
-    dateStr = dateStr.trim().replace(/\s+/g, " "); // Normalize spaces
+    if(dateStr == null) return
+    dateStr =  dateStr.trim().replace(/\s+/g, " "); // Normalize spaces
 
     // Handling relative time (e.g., "1 d", "11h", "25m")
     const relativeMatch = dateStr.match(/^(\d+)\s*([dhms])$/);
